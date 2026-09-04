@@ -28,6 +28,11 @@ Additionally, Eclipse SysON embraces the standard API for interconnection, enhan
 
 Through this initiative, we seek to foster growth within the MBSE community by providing a robust and accessible tool that harmonizes seamlessly with modern modeling landscapes.
 
+## Building and Running Locally
+
+See [docs/development.md](docs/development.md) for instructions on building and running
+this fork from source.
+
 ## Licenses
 
 Eclipse Public License 2.0
