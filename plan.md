@@ -534,10 +534,44 @@ path that does not exist. Anything touching the datasource has to be a full
 `@SpringBootTest(webEnvironment = RANDOM_PORT)` — the recipe already used by
 `SysMLMoveElementServiceDelegateIntegrationTests`.
 
-**Still to build:** model-scope serialization (read path), the Anthropic client and prompt
-assembly, response validation through `ISysMLTextImporter`, the GraphQL mutations, a
-provenance metadata library (`@Generated { by, prompt, at }`, same shape as items 1–3), and
-the review/diff UI.
+**Built next — model-scope serialization (the read path).**
+
+`ModelScopeSelector` expands a user selection into the elements a generation will see;
+`ModelScopeSerializer` renders them as textual SysML v2 for the prompt. `ModelScopePolicy`
+carries the limits — owned depth, related depth, an element budget and a character budget —
+so scope control is a parameter the caller sets rather than a surprise on an invoice.
+
+Three decisions worth keeping:
+
+1. **Expansion walks owned relationships, not `eCrossReferences()`.** A typing such as
+   `part x : Def` is owned by `x` as a `FeatureTyping` whose other end is `Def`, so walking
+   `getOwnedRelationship()` reaches definitions without depending on how EMF treats derived
+   references. Verified against a parsed model rather than assumed.
+2. **Standard-library elements are never pulled in**, via `ElementUtil.isFromStandardLibrary`.
+   This filter does real work rather than guarding a case that cannot happen: an
+   `attribute capacity : ScalarValues::Real` genuinely reaches `ScalarValues::Real` in one
+   hop, and without the filter the library would flood the context.
+3. **The output is fragments under qualified-name comments, not one compilable file.** A
+   scope is an arbitrary slice, so its elements generally share no enclosing namespace, and
+   pretending otherwise would mean inventing package structure that is not in the model.
+   Truncation is reported rather than silent — a model shown a partial model without being
+   told will reason confidently about what it cannot see.
+
+**A test-classpath gotcha that will bite again.** A module cannot casually hold both a Spring
+Boot test and a test-scoped dependency on `syson-application-configuration`. That dependency
+is what lets a test parse against the real default libraries, but it puts upstream's entire
+web stack on the classpath, and Boot then insists on standing it up: `WebEnvironment.NONE`
+leaves `SpringWebMvcConfigurer` without `WebProperties`, `MOCK` leaves `WebSocketConfiguration`
+without a real `ServerContainer`, and either way `ImagesController`'s `/api/images/**/*`
+mapping is rejected by Spring 7's pattern parser unless
+`spring.mvc.pathmatch.matching-strategy=ANT_PATH_MATCHER` is set — which the real application
+does set in `application.properties`, a file not on a service module's classpath. The way
+through is `webEnvironment = RANDOM_PORT` plus that property, which is the same recipe
+`SysONAiSchemaCoexistenceTests` already needed.
+
+**Still to build:** the Anthropic client and prompt assembly, response validation through
+`ISysMLTextImporter`, the GraphQL mutations, a provenance metadata library
+(`@Generated { by, prompt, at }`, same shape as items 1–3), and the review/diff UI.
 
 **Sequencing.** The seven goals share one pipeline — scope selection → serialize context →
 LLM call → parse and validate returned SysML → diff → apply with provenance — and differ

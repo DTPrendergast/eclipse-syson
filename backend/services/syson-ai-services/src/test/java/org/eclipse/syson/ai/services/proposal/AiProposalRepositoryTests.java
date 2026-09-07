@@ -33,7 +33,20 @@ import org.testcontainers.containers.PostgreSQLContainer;
  *
  * @author DTPrendergast
  */
-@SpringBootTest(classes = { AiProposalRepositoryTests.TestConfiguration.class })
+// This boots a full servlet environment for what is only a persistence test, and that is forced by
+// the module's test classpath rather than by anything here. The scope tests need
+// syson-application-configuration (they parse against the real default libraries), which puts
+// upstream's whole web stack on the classpath, and Boot's auto-configuration then insists on
+// standing it up: WebEnvironment.NONE leaves SpringWebMvcConfigurer without WebProperties, and MOCK
+// leaves WebSocketConfiguration without a real ServerContainer. RANDOM_PORT is the same recipe
+// SysONAiSchemaCoexistenceTests uses, for the same reason.
+//
+// The property is upstream's too: ImagesController maps "/api/images/**/*", which Spring 7's
+// default pattern parser rejects. The real application sets this in application.properties, which
+// is not on this module's classpath.
+@SpringBootTest(classes = { AiProposalRepositoryTests.TestConfiguration.class },
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "spring.mvc.pathmatch.matching-strategy=ANT_PATH_MATCHER")
 class AiProposalRepositoryTests {
 
     private static final String MODEL_ID = "claude-opus-5";

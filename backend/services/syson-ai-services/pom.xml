@@ -28,6 +28,16 @@
 	<description>SysON AI Modeling Assistant Services (proposal persistence, model-scope serialization, generation pipeline)</description>
 
 	<dependencies>
+		<!-- Main: model-scope serialization walks Element and renders it with
+		     SysMLElementSerializer; ElementUtil tells standard-library elements apart. -->
+		<dependency>
+			<groupId>org.eclipse.syson</groupId>
+			<artifactId>syson-sysml-metamodel</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.syson</groupId>
+			<artifactId>syson-sysml-metamodel-services</artifactId>
+		</dependency>
 		<!-- Proposals are persisted with Spring Data JDBC, the same persistence style the
 		     Sirius Web platform itself uses (see org.eclipse.sirius.web.domain). -->
 		<dependency>
@@ -41,6 +51,18 @@
 			<artifactId>liquibase-core</artifactId>
 		</dependency>
 
+		<!-- Test-only: the scope tests parse real textual SysML into a model rather than
+		     hand-building EMF, so what they serialize is what the parser actually produces. -->
+		<dependency>
+			<groupId>org.eclipse.syson</groupId>
+			<artifactId>syson-sysml-import</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.syson</groupId>
+			<artifactId>syson-application-configuration</artifactId>
+			<scope>test</scope>
+		</dependency>
 		<!-- Brings ArchUnit and AbstractCodingRulesTests, the architecture-test pattern every
 		     module in this fork mirrors. -->
 		<dependency>
