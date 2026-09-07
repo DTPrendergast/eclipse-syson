@@ -106,6 +106,10 @@
 			<groupId>org.eclipse.syson</groupId>
 			<artifactId>syson-verification-library</artifactId>
 		</dependency>
+		<dependency>
+			<groupId>org.eclipse.syson</groupId>
+			<artifactId>syson-operational-concept-library</artifactId>
+		</dependency>
 
 		<!-- Test Dependencies -->
 		<dependency>

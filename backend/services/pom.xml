@@ -39,6 +39,7 @@
 		<module>syson-services</module>
 		<module>syson-table-services</module>
 		<module>syson-tree-services</module>
+		<module>syson-operational-concept-library</module>
 		<module>syson-sysml-metamodel-services</module>
 		<module>syson-sysml-rest-api-services</module>
 		<module>syson-verification-library</module>
