@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Copyright (c) 2026 Obeo.
+  ~ This program and the accompanying materials
+  ~ are made available under the terms of the Eclipse Public License v2.0
+  ~ which accompanies this distribution, and is available at
+  ~ https://www.eclipse.org/legal/epl-2.0/
+  ~
+  ~ SPDX-License-Identifier: EPL-2.0
+  ~
+  ~ Contributors:
+  ~     Obeo - initial API and implementation
+  -->
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
+
+    <changeSet id="001-create-ai-proposal-tables" author="syson">
+        <comment>
+            A proposal is what an assistant run produces: generated SysML v2 text that a human
+            must review before any of it enters the model. It is persisted rather than held in
+            memory so that a review survives a page refresh or a restart, and so that the
+            engineer who reviews it need not be the one who requested it.
+        </comment>
+
+        <createTable tableName="ai_proposal">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_ai_proposal" />
+            </column>
+            <!-- The project this proposal was generated against. Not a foreign key to the
+                 platform's project table on purpose: that table is owned upstream, and a
+                 cross-schema FK would couple our migration to theirs. -->
+            <column name="project_id" type="TEXT">
+                <constraints nullable="false" />
+            </column>
+            <column name="task_kind" type="TEXT">
+                <constraints nullable="false" />
+            </column>
+            <column name="status" type="TEXT">
+                <constraints nullable="false" />
+            </column>
+            <!-- Provenance: what was asked, of which model, by whom, when. -->
+            <column name="prompt" type="TEXT">
+                <constraints nullable="false" />
+            </column>
+            <column name="model_id" type="TEXT">
+                <constraints nullable="false" />
+            </column>
+            <column name="created_by" type="TEXT">
+                <constraints nullable="false" />
+            </column>
+            <column name="created_on" type="TIMESTAMPTZ">
+                <constraints nullable="false" />
+            </column>
+            <column name="last_modified_on" type="TIMESTAMPTZ">
+                <constraints nullable="false" />
+            </column>
+        </createTable>
+
+        <createTable tableName="ai_proposal_item">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_ai_proposal_item" />
+            </column>
+            <column name="ai_proposal_id" type="UUID">
+                <constraints nullable="false" />
+            </column>
+            <!-- Individual accept/reject is a requirement, so each candidate is its own row
+                 with its own status rather than one blob of generated text. -->
+            <column name="item_index" type="INTEGER">
+                <constraints nullable="false" />
+            </column>
+            <column name="label" type="TEXT">
+                <constraints nullable="false" />
+            </column>
+            <column name="sysml_fragment" type="TEXT">
+                <constraints nullable="false" />
+            </column>
+            <column name="status" type="TEXT">
+                <constraints nullable="false" />
+            </column>
+            <!-- Set once an accepted item has actually been applied to the model. -->
+            <column name="applied_element_id" type="TEXT" />
+        </createTable>
+
+        <addForeignKeyConstraint baseTableName="ai_proposal_item" baseColumnNames="ai_proposal_id"
+                                 constraintName="fk_ai_proposal_item_ai_proposal_id"
+                                 referencedTableName="ai_proposal" referencedColumnNames="id"
+                                 onDelete="CASCADE" />
+        <createIndex tableName="ai_proposal" indexName="idx_ai_proposal_project_id">
+            <column name="project_id" />
+        </createIndex>
+    </changeSet>
+</databaseChangeLog>

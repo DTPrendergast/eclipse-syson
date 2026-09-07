@@ -31,6 +31,7 @@
 	<packaging>pom</packaging>
 
 	<modules>
+		<module>syson-ai-services</module>
 		<module>syson-direct-edit-grammar</module>
 		<module>syson-diagram-services</module>
 		<module>syson-form-services</module>

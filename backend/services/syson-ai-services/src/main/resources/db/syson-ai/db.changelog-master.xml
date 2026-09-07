@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Copyright (c) 2026 Obeo.
+  ~ This program and the accompanying materials
+  ~ are made available under the terms of the Eclipse Public License v2.0
+  ~ which accompanies this distribution, and is available at
+  ~ https://www.eclipse.org/legal/epl-2.0/
+  ~
+  ~ SPDX-License-Identifier: EPL-2.0
+  ~
+  ~ Contributors:
+  ~     Obeo - initial API and implementation
+  -->
+<!--
+  ~ This is SysON's own changelog, entirely separate from the platform's
+  ~ db/db.changelog-master.xml (shipped inside sirius-web-infrastructure). That master is a
+  ~ fixed <include> list with no includeAll and no extension hook, so we cannot contribute to
+  ~ it without editing an upstream artifact. Instead this changelog is applied by
+  ~ SysONAiDatabaseMigration against its own tracking tables.
+  -->
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
+    <include file="db/syson-ai/changelog/001-create-ai-proposal-tables.xml" />
+</databaseChangeLog>
