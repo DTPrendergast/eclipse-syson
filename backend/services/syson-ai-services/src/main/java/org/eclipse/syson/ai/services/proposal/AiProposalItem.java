@@ -47,16 +47,23 @@ public class AiProposalItem {
     private String appliedElementId;
 
     public AiProposalItem() {
-        // Required by Spring Data JDBC.
+        // Required by Spring Data JDBC, which prefers the no-arg constructor when a class declares
+        // several, so materializing a row never runs the constructor below.
     }
 
-    public static AiProposalItem create(String label, String sysmlFragment) {
-        var item = new AiProposalItem();
-        item.id = UUID.randomUUID();
-        item.label = Objects.requireNonNull(label);
-        item.sysmlFragment = Objects.requireNonNull(sysmlFragment);
-        item.status = AiProposalItemStatus.PENDING;
-        return item;
+    /**
+     * Creates an item awaiting a per-item accept or reject decision.
+     *
+     * @param label
+     *            how the candidate is shown in the review UI
+     * @param sysmlFragment
+     *            the candidate as textual SysML v2, validated by the parser before it is applied
+     */
+    public AiProposalItem(String label, String sysmlFragment) {
+        this.id = UUID.randomUUID();
+        this.label = Objects.requireNonNull(label);
+        this.sysmlFragment = Objects.requireNonNull(sysmlFragment);
+        this.status = AiProposalItemStatus.PENDING;
     }
 
     public UUID getId() {

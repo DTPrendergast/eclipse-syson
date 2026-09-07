@@ -41,6 +41,13 @@
 			<artifactId>liquibase-core</artifactId>
 		</dependency>
 
+		<!-- Brings ArchUnit and AbstractCodingRulesTests, the architecture-test pattern every
+		     module in this fork mirrors. -->
+		<dependency>
+			<groupId>org.eclipse.syson</groupId>
+			<artifactId>syson-tests</artifactId>
+			<scope>test</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>

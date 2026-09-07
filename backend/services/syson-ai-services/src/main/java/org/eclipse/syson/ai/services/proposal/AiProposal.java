@@ -71,11 +71,12 @@ public class AiProposal implements Persistable<UUID> {
     private boolean isNew;
 
     public AiProposal() {
-        // Required by Spring Data JDBC.
+        // Required by Spring Data JDBC, which prefers the no-arg constructor when a class declares
+        // several, so materializing a row never runs the constructor below.
     }
 
     /**
-     * Creates a proposal that is waiting for review.
+     * Creates a proposal that is waiting for review, not yet persisted.
      *
      * @param projectId
      *            the project the proposal was generated against
@@ -89,22 +90,19 @@ public class AiProposal implements Persistable<UUID> {
      *            who requested it, kept as provenance
      * @param items
      *            the candidates offered for review
-     * @return a new proposal, not yet persisted
      */
-    public static AiProposal create(String projectId, String taskKind, String prompt, String modelId, String createdBy, List<AiProposalItem> items) {
-        var proposal = new AiProposal();
-        proposal.id = UUID.randomUUID();
-        proposal.projectId = Objects.requireNonNull(projectId);
-        proposal.taskKind = Objects.requireNonNull(taskKind);
-        proposal.prompt = Objects.requireNonNull(prompt);
-        proposal.modelId = Objects.requireNonNull(modelId);
-        proposal.createdBy = Objects.requireNonNull(createdBy);
-        proposal.items = new ArrayList<>(Objects.requireNonNull(items));
-        proposal.status = AiProposalStatus.PENDING_REVIEW;
-        proposal.createdOn = Instant.now();
-        proposal.lastModifiedOn = proposal.createdOn;
-        proposal.isNew = true;
-        return proposal;
+    public AiProposal(String projectId, String taskKind, String prompt, String modelId, String createdBy, List<AiProposalItem> items) {
+        this.id = UUID.randomUUID();
+        this.projectId = Objects.requireNonNull(projectId);
+        this.taskKind = Objects.requireNonNull(taskKind);
+        this.prompt = Objects.requireNonNull(prompt);
+        this.modelId = Objects.requireNonNull(modelId);
+        this.createdBy = Objects.requireNonNull(createdBy);
+        this.items = new ArrayList<>(Objects.requireNonNull(items));
+        this.status = AiProposalStatus.PENDING_REVIEW;
+        this.createdOn = Instant.now();
+        this.lastModifiedOn = this.createdOn;
+        this.isNew = true;
     }
 
     @Override
