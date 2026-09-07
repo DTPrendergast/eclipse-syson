@@ -569,9 +569,35 @@ does set in `application.properties`, a file not on a service module's classpath
 through is `webEnvironment = RANDOM_PORT` plus that property, which is the same recipe
 `SysONAiSchemaCoexistenceTests` already needed.
 
-**Still to build:** the Anthropic client and prompt assembly, response validation through
-`ISysMLTextImporter`, the GraphQL mutations, a provenance metadata library
-(`@Generated { by, prompt, at }`, same shape as items 1–3), and the review/diff UI.
+**Built next — the Anthropic client and goal 3's prompt.**
+
+`SysONAiProperties` (`syson.ai.*`), `AnthropicGenerationClient` over the official
+`com.anthropic:anthropic-java` SDK, and `DerivedRequirementsPromptFactory`, the first of the
+thin per-goal adapters.
+
+- **No key means switched off, not broken.** `syson.ai.api-key` is wired to
+  `${ANTHROPIC_API_KEY:}` in `application.properties` and defaults to empty; the client reports
+  a `NOT_CONFIGURED` outcome rather than throwing, so the whole tool builds, boots and tests
+  without credentials. The key is never written to a file in the repo.
+- **A refusal is not an exception.** The API returns HTTP 200 with `stop_reason: refusal`, and
+  a caller that only catches exceptions would read that as an empty answer. `GenerationResult`
+  models `ANSWERED` / `REFUSED` / `TRUNCATED` / `NOT_CONFIGURED` explicitly. `TRUNCATED`
+  matters just as much: a response cut off at the token ceiling is a fragment, and parsing it
+  would silently drop whatever was lost.
+- **The prompt asks for textual SysML v2, not JSON.** The response is validated by re-parsing
+  it through the same importer every other textual edit uses, so the parser is the check — which
+  only works if the model emits something the parser reads. The system prompt also forbids
+  `calc`, the construct recorded above as silently lossy, and tells the model when it is seeing
+  a truncated scope.
+
+Model is `claude-opus-5`. Still to do on this piece: **server-side refusal fallbacks** are
+recommended for Opus 5 code and are not wired up — the Java builder methods are not in the
+reference used here, and guessing SDK bindings is how you get code that compiles and fails at
+runtime. Worth adding from the SDK's own examples before this goes in front of users.
+
+**Still to build:** response validation through `ISysMLTextImporter`, the GraphQL mutations, a
+provenance metadata library (`@Generated { by, prompt, at }`, same shape as items 1–3), and the
+review/diff UI.
 
 **Sequencing.** The seven goals share one pipeline — scope selection → serialize context →
 LLM call → parse and validate returned SysML → diff → apply with provenance — and differ

@@ -28,6 +28,14 @@
 	<description>SysON AI Modeling Assistant Services (proposal persistence, model-scope serialization, generation pipeline)</description>
 
 	<dependencies>
+		<!-- Main: inference goes to the Anthropic API through the official Java SDK.
+		     Version is pinned here rather than in the root pom's dependencyManagement to keep
+		     this fork's footprint in upstream files as small as possible. -->
+		<dependency>
+			<groupId>com.anthropic</groupId>
+			<artifactId>anthropic-java</artifactId>
+			<version>2.34.0</version>
+		</dependency>
 		<!-- Main: model-scope serialization walks Element and renders it with
 		     SysMLElementSerializer; ElementUtil tells standard-library elements apart. -->
 		<dependency>
