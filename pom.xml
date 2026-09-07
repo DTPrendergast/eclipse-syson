@@ -206,6 +206,11 @@
 				<artifactId>syson-tree-services</artifactId>
 				<version>${syson.version}</version>
 			</dependency>
+			<dependency>
+				<groupId>org.eclipse.syson</groupId>
+				<artifactId>syson-verification-library</artifactId>
+				<version>${syson.version}</version>
+			</dependency>
             <dependency>
               <groupId>org.liquibase</groupId>
               <artifactId>liquibase-core</artifactId>
