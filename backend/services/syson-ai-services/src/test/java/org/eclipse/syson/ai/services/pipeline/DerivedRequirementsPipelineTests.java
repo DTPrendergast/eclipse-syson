@@ -1,0 +1,231 @@
+/*******************************************************************************
+ * Copyright (c) 2026 Obeo.
+ * This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v2.0
+ * which accompanies this distribution, and is available at
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *     Obeo - initial API and implementation
+ *******************************************************************************/
+package org.eclipse.syson.ai.services.pipeline;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.io.ByteArrayInputStream;
+import java.util.List;
+
+import org.eclipse.emf.ecore.resource.Resource;
+import org.eclipse.emf.ecore.resource.ResourceSet;
+import org.eclipse.syson.ai.services.generation.DerivedRequirementsPromptFactory;
+import org.eclipse.syson.ai.services.generation.GenerationRequest;
+import org.eclipse.syson.ai.services.generation.GenerationResult;
+import org.eclipse.syson.ai.services.generation.IGenerationClient;
+import org.eclipse.syson.ai.services.proposal.AiProposal;
+import org.eclipse.syson.ai.services.proposal.AiProposalItemStatus;
+import org.eclipse.syson.ai.services.proposal.AiProposalStatus;
+import org.eclipse.syson.ai.services.proposal.IAiProposalRepository;
+import org.eclipse.syson.ai.services.scope.ModelScopePolicy;
+import org.eclipse.syson.ai.services.scope.ModelScopeSelector;
+import org.eclipse.syson.ai.services.scope.ModelScopeSerializer;
+import org.eclipse.syson.ai.services.validation.GeneratedSysmlValidator;
+import org.eclipse.syson.application.configuration.SysONDefaultLibrariesConfiguration;
+import org.eclipse.syson.application.configuration.SysONLoadDefaultLibrariesOnApplicationStartConfiguration;
+import org.eclipse.syson.sysml.ASTTransformer;
+import org.eclipse.syson.sysml.Element;
+import org.eclipse.syson.sysml.SysmlToAst;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Tests of the derived-requirements pipeline.
+ *
+ * <p>
+ * Everything except the model call and the database is real: a real parsed model for the scope, the
+ * real scope services, the real prompt, the real parser behind validation. Only
+ * {@link IGenerationClient} is stubbed, since the point is to test what the pipeline does with a
+ * response rather than to call the API.
+ * </p>
+ *
+ * @author DTPrendergast
+ */
+class DerivedRequirementsPipelineTests {
+
+    private static final String MODEL = """
+            package PowerSystem {
+                part def Battery;
+                part battery : Battery;
+                requirement <REQ1> enduranceRequirement {
+                    doc /* The system shall operate for 8 hours. */
+                    subject battery;
+                }
+            }
+            """;
+
+    private static final String TWO_GOOD_REQUIREMENTS = """
+            requirement <DER1> cellCapacityRequirement {
+                doc /* Each cell shall provide at least 3.2 Ah. */
+            }
+            requirement <DER2> thermalRequirement {
+                doc /* The pack shall stay below 45 degrees C under load. */
+            }
+            """;
+
+    private final IAiProposalRepository repository = mock(IAiProposalRepository.class);
+
+    private final IGenerationClient generationClient = mock(IGenerationClient.class);
+
+    private final DerivedRequirementsPipeline pipeline = new DerivedRequirementsPipeline(
+            new ModelScopeSelector(),
+            new ModelScopeSerializer(),
+            new DerivedRequirementsPromptFactory(),
+            this.generationClient,
+            new GeneratedSysmlValidator(new SysmlToAst(null)),
+            this.repository);
+
+    @Test
+    void storesOneReviewableItemPerCandidate() {
+        this.stubGeneration(TWO_GOOD_REQUIREMENTS);
+        when(this.repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var outcome = this.run();
+
+        assertThat(outcome.hasSomethingToReview()).isTrue();
+        assertThat(outcome.candidateCount()).isEqualTo(2);
+    }
+
+    @Test
+    void everyStoredItemStartsPendingAndTheProposalStartsAwaitingReview() {
+        this.stubGeneration(TWO_GOOD_REQUIREMENTS);
+        when(this.repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        this.run();
+
+        var saved = this.captureSaved();
+        // The review gate is a property of the data, not of the UI: nothing is applied, and the
+        // pipeline has no code path into the model at all.
+        assertThat(saved.getStatus()).isEqualTo(AiProposalStatus.PENDING_REVIEW);
+        assertThat(saved.getItems()).allSatisfy(item -> assertThat(item.getStatus()).isEqualTo(AiProposalItemStatus.PENDING));
+        assertThat(saved.getItems()).allSatisfy(item -> assertThat(item.getAppliedElementId()).isEmpty());
+    }
+
+    @Test
+    void recordsProvenanceOnTheProposal() {
+        this.stubGeneration(TWO_GOOD_REQUIREMENTS);
+        when(this.repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        this.run();
+
+        var saved = this.captureSaved();
+        assertThat(saved.getPrompt()).isEqualTo("Derive cell-level requirements for the battery.");
+        assertThat(saved.getModelId()).isEqualTo("claude-opus-5");
+        assertThat(saved.getCreatedBy()).isEqualTo("dtprendergast");
+        assertThat(saved.getTaskKind()).isEqualTo(DerivedRequirementsPipeline.TASK_KIND);
+        assertThat(saved.getProjectId()).isEqualTo("project-1");
+    }
+
+    @Test
+    void persistsNothingWhenTheResponseFailsValidation() {
+        this.stubGeneration("Sure! Here are some requirements you might consider.");
+
+        var outcome = this.run();
+
+        assertThat(outcome.hasSomethingToReview()).isFalse();
+        assertThat(outcome.problems()).isNotEmpty();
+        // Storing candidates that failed validation would invite someone to apply them later.
+        verify(this.repository, never()).save(any());
+    }
+
+    @Test
+    void persistsNothingWhenTheModelDeclines() {
+        when(this.generationClient.generate(any(GenerationRequest.class)))
+                .thenReturn(new GenerationResult("", "claude-opus-5", GenerationResult.Outcome.REFUSED, "The model declined to answer this request."));
+
+        var outcome = this.run();
+
+        assertThat(outcome.hasSomethingToReview()).isFalse();
+        assertThat(outcome.problems()).containsExactly("The model declined to answer this request.");
+        verify(this.repository, never()).save(any());
+    }
+
+    @Test
+    void persistsNothingWhenTheResponseWasTruncated() {
+        when(this.generationClient.generate(any(GenerationRequest.class)))
+                .thenReturn(new GenerationResult("requirement <DER1> halfWritten", "claude-opus-5", GenerationResult.Outcome.TRUNCATED, "hit the ceiling"));
+
+        var outcome = this.run();
+
+        // A fragment must not be parsed as if it were the whole answer.
+        assertThat(outcome.hasSomethingToReview()).isFalse();
+        verify(this.repository, never()).save(any());
+    }
+
+    @Test
+    void treatsAnEmptyButValidResponseAsNothingToReviewRatherThanAFailure() {
+        this.stubGeneration("");
+
+        var outcome = this.run();
+
+        assertThat(outcome.hasSomethingToReview()).isFalse();
+        assertThat(outcome.problems()).containsExactly("The model did not propose any requirements from this context.");
+        verify(this.repository, never()).save(any());
+    }
+
+    @Test
+    void putsTheSelectedModelContextIntoThePrompt() {
+        this.stubGeneration(TWO_GOOD_REQUIREMENTS);
+        when(this.repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        this.run();
+
+        var captor = org.mockito.ArgumentCaptor.forClass(GenerationRequest.class);
+        verify(this.generationClient).generate(captor.capture());
+        assertThat(captor.getValue().userPrompt()).contains("enduranceRequirement");
+        assertThat(captor.getValue().userPrompt()).contains("Derive cell-level requirements for the battery.");
+    }
+
+    private GenerationOutcome run() {
+        Element seed = this.find("enduranceRequirement");
+        return this.pipeline.run("project-1", List.of(seed), "Derive cell-level requirements for the battery.", "dtprendergast",
+                ModelScopePolicy.defaultPolicy());
+    }
+
+    private void stubGeneration(String responseText) {
+        when(this.generationClient.generate(any(GenerationRequest.class)))
+                .thenReturn(new GenerationResult(responseText, "claude-opus-5", GenerationResult.Outcome.ANSWERED, null));
+    }
+
+    private AiProposal captureSaved() {
+        var captor = org.mockito.ArgumentCaptor.forClass(AiProposal.class);
+        verify(this.repository).save(captor.capture());
+        return captor.getValue();
+    }
+
+    private Element find(String declaredName) {
+        var iterator = this.parseResource().getAllContents();
+        while (iterator.hasNext()) {
+            var next = iterator.next();
+            if (next instanceof Element element && declaredName.equals(element.getDeclaredName())) {
+                return element;
+            }
+        }
+        return fail("No element named " + declaredName);
+    }
+
+    private Resource parseResource() {
+        ResourceSet resourceSet = new SysONDefaultLibrariesConfiguration(new SysONLoadDefaultLibrariesOnApplicationStartConfiguration())
+                .getLibrariesResourceSet();
+        var astParsingResult = new SysmlToAst(null).convert(new ByteArrayInputStream(MODEL.getBytes()), "sysml");
+        if (astParsingResult.ast().isEmpty()) {
+            return fail("No AST produced");
+        }
+        return new ASTTransformer().convertResource(astParsingResult.ast().get(), resourceSet);
+    }
+}

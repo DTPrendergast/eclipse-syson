@@ -624,8 +624,27 @@ Two other decisions:
   Markdown fences are stripped rather than treated as fatal — models emit them despite being
   told not to — but the fact that it happened is recorded, since it means the prompt was ignored.
 
-**Still to build:** the GraphQL mutations, a provenance metadata library
-(`@Generated { by, prompt, at }`, same shape as items 1–3), and the review/diff UI.
+**Built next — the pipeline itself.**
+
+`DerivedRequirementsPipeline` runs scope → serialize → prompt → generate → validate → persist,
+and is what the GraphQL mutations will sit on. Two properties are worth stating plainly because
+they are what make the design safe rather than merely intended:
+
+- **It has no code path into the model.** It reads elements to build context and writes a
+  proposal row; it never adds an element. That is what the single-threaded
+  `EditingContextEventProcessor` forces — seeds are read on that thread and handed in, the LLM
+  call happens off it, and applying an accepted candidate is a separate fast mutation later.
+- **The review gate is in the data.** Everything it writes is `PENDING_REVIEW` with every item
+  `PENDING` and no applied element id. Tests assert this rather than trusting it.
+
+Nothing is persisted when a run fails — a refusal, a truncated response, or output that fails
+validation all leave no reviewable artefact, because storing candidates that failed validation
+would invite someone to apply them later. A model that correctly proposes nothing is reported
+as "nothing to review", not as a failure.
+
+**Still to build:** the GraphQL mutations (a dispatched read to gather seeds, and an apply
+mutation that runs accepted candidates through `ISysMLTextImporter`), a provenance metadata
+library (`@Generated { by, prompt, at }`, same shape as items 1–3), and the review/diff UI.
 
 **Sequencing.** The seven goals share one pipeline — scope selection → serialize context →
 LLM call → parse and validate returned SysML → diff → apply with provenance — and differ
