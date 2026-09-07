@@ -59,12 +59,11 @@
 			<artifactId>liquibase-core</artifactId>
 		</dependency>
 
-		<!-- Test-only: the scope tests parse real textual SysML into a model rather than
-		     hand-building EMF, so what they serialize is what the parser actually produces. -->
+		<!-- Main: generated SysML is validated by parsing it, so the parser is a runtime
+		     dependency and not just a test fixture. -->
 		<dependency>
 			<groupId>org.eclipse.syson</groupId>
 			<artifactId>syson-sysml-import</artifactId>
-			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.eclipse.syson</groupId>

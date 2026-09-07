@@ -595,9 +595,37 @@ recommended for Opus 5 code and are not wired up — the Java builder methods ar
 reference used here, and guessing SDK bindings is how you get code that compiles and fails at
 runtime. Worth adding from the SDK's own examples before this goes in front of users.
 
-**Still to build:** response validation through `ISysMLTextImporter`, the GraphQL mutations, a
-provenance metadata library (`@Generated { by, prompt, at }`, same shape as items 1–3), and the
-review/diff UI.
+**Built next — response validation, and a trap worth knowing about.**
+
+`GeneratedSysmlValidator` checks a model's response before any of it reaches a reviewer, and
+splits it into individually reviewable candidates.
+
+**Parsing alone is not a sufficient check, which is not obvious.** SysML v2 treats a bare name
+as an element declaration, so ordinary English prose parses *cleanly*: "Sure! Here are some
+requirements you might consider adopting." yields **nine** well-formed elements named `Sure`,
+`Here`, `are`, `some`… with **zero parse errors and zero warnings**. Measured, not assumed. A
+parse-only validator — which is what "let the parser validate it" naturally suggests, and what
+was built first here — would hand all nine to a reviewer as candidate requirements. So every
+top-level element must also be an instance of the kind the caller asked for
+(`RequirementUsage` for goal 3); that type check, not the parse, is what actually rejects prose.
+A response that is *partly* prose fails rather than being quietly trimmed: partly-prose means
+regenerate, not silently keep the good half.
+
+Two other decisions:
+
+- **Validation does not use `ISysMLTextImporter`.** That interface parses *and integrates* into
+  a live editing context — it is the write path, and validation happens before a human has
+  approved anything. So it parses into a throwaway `ResourceSet` the project never sees. The
+  importer is the right tool at apply time, on accepted candidates only. The trade: references
+  from generated text into the project or the libraries do not resolve during validation, so
+  this checks well-formedness, not that every name exists. Name resolution is the importer's job.
+- **The stored fragment is the re-serialized element, not the model's own text**, so what the
+  reviewer reads, what is stored on the proposal item, and what is applied are the same string.
+  Markdown fences are stripped rather than treated as fatal — models emit them despite being
+  told not to — but the fact that it happened is recorded, since it means the prompt was ignored.
+
+**Still to build:** the GraphQL mutations, a provenance metadata library
+(`@Generated { by, prompt, at }`, same shape as items 1–3), and the review/diff UI.
 
 **Sequencing.** The seven goals share one pipeline — scope selection → serialize context →
 LLM call → parse and validate returned SysML → diff → apply with provenance — and differ
