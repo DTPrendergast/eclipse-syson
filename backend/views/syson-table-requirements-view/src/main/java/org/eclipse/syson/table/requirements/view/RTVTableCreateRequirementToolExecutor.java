@@ -25,6 +25,7 @@ import org.eclipse.sirius.components.representations.Success;
 import org.eclipse.sirius.components.tables.Table;
 import org.eclipse.sirius.components.tables.descriptions.TableDescription;
 import org.eclipse.syson.sysml.ViewUsage;
+import org.eclipse.syson.sysml.services.api.ISysMLTextImporter;
 import org.eclipse.syson.table.requirements.view.services.RTVMutationServices;
 import org.springframework.stereotype.Service;
 
@@ -40,9 +41,9 @@ public class RTVTableCreateRequirementToolExecutor implements IToolMenuEntryExec
 
     private final RTVMutationServices mutationServices;
 
-    public RTVTableCreateRequirementToolExecutor(IObjectSearchService objectSearchService) {
+    public RTVTableCreateRequirementToolExecutor(IObjectSearchService objectSearchService, ISysMLTextImporter textImporter) {
         this.objectSearchService = Objects.requireNonNull(objectSearchService);
-        this.mutationServices = new RTVMutationServices(this.objectSearchService);
+        this.mutationServices = new RTVMutationServices(this.objectSearchService, textImporter);
     }
 
     @Override
@@ -55,7 +56,7 @@ public class RTVTableCreateRequirementToolExecutor implements IToolMenuEntryExec
 
         var viewUsage = this.getViewUsage(editingContext, table);
         if (viewUsage != null) {
-            boolean success = this.mutationServices.createRequirement(viewUsage);
+            boolean success = this.mutationServices.createRequirement(viewUsage, editingContext);
             if (success) {
                 return new Success(ChangeKind.SEMANTIC_CHANGE, Map.of());
             }

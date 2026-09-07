@@ -19,14 +19,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.sirius.components.core.api.IIdentityService;
 import org.eclipse.sirius.components.tables.ColumnFilter;
 import org.eclipse.sirius.components.tables.ColumnSort;
+import org.eclipse.syson.requirements.library.services.RequirementAttributesQueryServices;
+import org.eclipse.syson.sysml.Dependency;
 import org.eclipse.syson.sysml.Documentation;
+import org.eclipse.syson.sysml.Element;
+import org.eclipse.syson.sysml.OwningMembership;
 import org.eclipse.syson.sysml.RequirementUsage;
 import org.eclipse.syson.sysml.ViewUsage;
+import org.eclipse.syson.table.verification.view.services.VTVQueryServices;
+import org.eclipse.syson.verification.library.services.VerificationLinkQueryServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,9 +55,26 @@ public class RTVQueryServices {
 
     private final IIdentityService identityService;
 
+    // Reuses item 1's own procedureId-reading logic and the VerificationLink workaround (see
+    // VerificationProcedure.sysml's Javadoc on VerificationLink for why this isn't the standard "verify"
+    // relationship) instead of duplicating either. Not constructor-injected: both transitively need
+    // MetamodelQueryElementService, a plain utility class, not a Spring bean -- see VTVQueryServices' own
+    // comment on why that must not be a constructor parameter of a class Sirius Web instantiates via
+    // AutowireCapableBeanFactory.createBean(Class).
+    private final VTVQueryServices vtvQueryServices;
+
+    private final VerificationLinkQueryServices verificationLinkQueryServices = new VerificationLinkQueryServices();
+
+    private final RequirementAttributesQueryServices requirementAttributesQueryServices = new RequirementAttributesQueryServices();
+
+    private final RTVThresholdOrObjectiveMapping thresholdOrObjectiveMapping = new RTVThresholdOrObjectiveMapping();
+
+    private final RTVRequirementTypeMapping requirementTypeMapping = new RTVRequirementTypeMapping();
+
     public RTVQueryServices(ObjectMapper objectMapper, IIdentityService identityService) {
         this.objectMapper = objectMapper;
         this.identityService = identityService;
+        this.vtvQueryServices = new VTVQueryServices(objectMapper);
     }
 
     /**
@@ -173,6 +197,131 @@ public class RTVQueryServices {
                 .orElse("");
     }
 
+    /**
+     * Returns the procedure ID of the verification case linked to the given requirement via the
+     * {@code VerificationLink} metadata (see that metadata's Javadoc for why this, and not the standard "verify"
+     * relationship), or an empty string if none is linked.
+     *
+     * @param requirementUsage
+     *            a {@code RequirementUsage}.
+     * @return the linked verification case's procedure ID, or {@code ""}.
+     */
+    public String getVerificationProcedureId(RequirementUsage requirementUsage) {
+        return this.verificationLinkQueryServices.getLinkedVerificationCase(requirementUsage)
+                .map(this.vtvQueryServices::getProcedureId)
+                .orElse("");
+    }
+
+    /**
+     * Returns the reqIds of this requirement's parents, comma-separated, or an empty string if none. A parent
+     * link is a {@code Dependency} owned by this requirement with itself as {@code client} and the parent as
+     * {@code supplier} -- the generic, untyped SysML v2 trace/derive construct, since the metamodel has no
+     * dedicated requirement-to-requirement relationship class (checked: no
+     * {@code DeriveRequirementUsage}/{@code RequirementDerivation}, and no {@code Dependency} subclasses at all
+     * exist in {@code backend/metamodel}).
+     *
+     * @param requirementUsage
+     *            a {@code RequirementUsage}.
+     * @return the comma-separated reqIds of its parent requirements, or {@code ""}.
+     */
+    public String getParentRequirementIds(RequirementUsage requirementUsage) {
+        return this.getParentRequirements(requirementUsage).stream()
+                .map(this::parentIdentifier)
+                .collect(Collectors.joining(", "));
+    }
+
+    private List<RequirementUsage> getParentRequirements(RequirementUsage requirementUsage) {
+        return this.getOwnedDependencies(requirementUsage).stream()
+                .filter(dependency -> dependency.getClient().contains(requirementUsage))
+                .flatMap(dependency -> dependency.getSupplier().stream())
+                .filter(RequirementUsage.class::isInstance)
+                .map(RequirementUsage.class::cast)
+                .toList();
+    }
+
+    /**
+     * Returns the {@code Dependency} relationships owned by the given element. Handles two different shapes
+     * empirically confirmed for how a {@code dependency from ... to ...;} statement ends up owned: directly in
+     * {@code ownedRelationship} (how {@code ISysMLTextImporter} places a single-relationship snippet, as used by
+     * {@code RTVMutationServices.setParentRequirements}), or wrapped in an {@code OwningMembership} (how a full
+     * package parse places the same statement written inline in a requirement's body). Relying on only one shape
+     * silently found nothing for the other.
+     */
+    private List<Dependency> getOwnedDependencies(Element element) {
+        List<Dependency> direct = element.getOwnedRelationship().stream()
+                .filter(Dependency.class::isInstance)
+                .map(Dependency.class::cast)
+                .toList();
+        List<Dependency> wrapped = element.getOwnedRelationship().stream()
+                .filter(OwningMembership.class::isInstance)
+                .map(OwningMembership.class::cast)
+                .flatMap(owningMembership -> owningMembership.getOwnedRelatedElement().stream())
+                .filter(Dependency.class::isInstance)
+                .map(Dependency.class::cast)
+                .toList();
+        return Stream.concat(direct.stream(), wrapped.stream()).toList();
+    }
+
+    private String parentIdentifier(RequirementUsage parent) {
+        String identifier;
+        if (parent.getReqId() != null && !parent.getReqId().isBlank()) {
+            identifier = parent.getReqId();
+        } else {
+            identifier = parent.getDeclaredName();
+        }
+        return identifier;
+    }
+
+    /**
+     * Returns the display label of the Requirement Type applied on the given requirement (one of
+     * {@code Functional}, {@code Interface}, {@code Performance}, {@code Physical}, {@code Design Constraint}),
+     * or an empty string if the requirement does not specialize (directly or indirectly) any of the standard
+     * library's {@code Requirements::*RequirementCheck} definitions. See {@link RTVRequirementTypeMapping}'s
+     * Javadoc for why this needs no metadata of our own.
+     *
+     * @param requirementUsage
+     *            a {@code RequirementUsage}.
+     * @return the display label of the requirement's type, or {@code ""}.
+     */
+    public String getRequirementType(RequirementUsage requirementUsage) {
+        return this.requirementTypeMapping.entries().entrySet().stream()
+                .filter(entry -> requirementUsage.specializesFromLibrary(entry.getValue()))
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElse("");
+    }
+
+    /**
+     * Returns the display label ({@code Threshold} or {@code Objective}) of the {@code ThresholdOrObjective}
+     * metadata applied on the given requirement, or an empty string if not set.
+     *
+     * @param requirementUsage
+     *            a {@code RequirementUsage}.
+     * @return the display label, or {@code ""}.
+     */
+    public String getThresholdOrObjective(RequirementUsage requirementUsage) {
+        String literal = this.requirementAttributesQueryServices.getThresholdOrObjective(requirementUsage);
+        String label;
+        if (literal.isEmpty()) {
+            label = "";
+        } else {
+            label = this.thresholdOrObjectiveMapping.literalToLabel(literal);
+        }
+        return label;
+    }
+
+    /**
+     * Returns the free-text category applied on the given requirement via the {@code RequirementCategory}
+     * metadata, or an empty string if not set.
+     *
+     * @param requirementUsage
+     *            a {@code RequirementUsage}.
+     * @return the category, or {@code ""}.
+     */
+    public String getCategory(RequirementUsage requirementUsage) {
+        return this.requirementAttributesQueryServices.getCategory(requirementUsage);
+    }
+
     public List<RequirementUsage> sortAndFilterRequirements(List<Object> objects, List<ColumnSort> columnSort, List<ColumnFilter> columnFilters, String globalFilterData) {
         var requirementsElements = objects.stream().filter(RequirementUsage.class::isInstance).map(RequirementUsage.class::cast).collect(Collectors.toList());
         this.filterRequirements(columnFilters, globalFilterData, requirementsElements);
@@ -191,6 +340,16 @@ public class RTVQueryServices {
                 requirementsElements.removeIf(r -> !this.isValidColumnFilterCandidate(r.getReqId(), columnFilter));
             } else if ("Documentation".equals(columnFilter.id())) {
                 requirementsElements.removeIf(r -> !this.isValidColumnFilterCandidate(this.getDocumentationBody(r), columnFilter));
+            } else if ("VerificationProcedureId".equals(columnFilter.id())) {
+                requirementsElements.removeIf(r -> !this.isValidColumnFilterCandidate(this.getVerificationProcedureId(r), columnFilter));
+            } else if ("ParentRequirements".equals(columnFilter.id())) {
+                requirementsElements.removeIf(r -> !this.isValidColumnFilterCandidate(this.getParentRequirementIds(r), columnFilter));
+            } else if ("RequirementType".equals(columnFilter.id())) {
+                requirementsElements.removeIf(r -> !this.isValidColumnFilterCandidate(this.getRequirementType(r), columnFilter));
+            } else if ("ThresholdOrObjective".equals(columnFilter.id())) {
+                requirementsElements.removeIf(r -> !this.isValidColumnFilterCandidate(this.getThresholdOrObjective(r), columnFilter));
+            } else if ("Category".equals(columnFilter.id())) {
+                requirementsElements.removeIf(r -> !this.isValidColumnFilterCandidate(this.getCategory(r), columnFilter));
             }
         }
     }
@@ -214,6 +373,36 @@ public class RTVQueryServices {
                     requirementsElements.sort(Comparator.comparing((RequirementUsage r) -> this.getDocumentationBody(r), String.CASE_INSENSITIVE_ORDER).reversed());
                 } else {
                     requirementsElements.sort(Comparator.comparing((RequirementUsage r) -> this.getDocumentationBody(r), String.CASE_INSENSITIVE_ORDER));
+                }
+            } else if ("VerificationProcedureId".equals(colSort.id())) {
+                if (colSort.desc()) {
+                    requirementsElements.sort(Comparator.comparing((RequirementUsage r) -> this.getVerificationProcedureId(r), String.CASE_INSENSITIVE_ORDER).reversed());
+                } else {
+                    requirementsElements.sort(Comparator.comparing((RequirementUsage r) -> this.getVerificationProcedureId(r), String.CASE_INSENSITIVE_ORDER));
+                }
+            } else if ("ParentRequirements".equals(colSort.id())) {
+                if (colSort.desc()) {
+                    requirementsElements.sort(Comparator.comparing((RequirementUsage r) -> this.getParentRequirementIds(r), String.CASE_INSENSITIVE_ORDER).reversed());
+                } else {
+                    requirementsElements.sort(Comparator.comparing((RequirementUsage r) -> this.getParentRequirementIds(r), String.CASE_INSENSITIVE_ORDER));
+                }
+            } else if ("RequirementType".equals(colSort.id())) {
+                if (colSort.desc()) {
+                    requirementsElements.sort(Comparator.comparing((RequirementUsage r) -> this.getRequirementType(r), String.CASE_INSENSITIVE_ORDER).reversed());
+                } else {
+                    requirementsElements.sort(Comparator.comparing((RequirementUsage r) -> this.getRequirementType(r), String.CASE_INSENSITIVE_ORDER));
+                }
+            } else if ("ThresholdOrObjective".equals(colSort.id())) {
+                if (colSort.desc()) {
+                    requirementsElements.sort(Comparator.comparing((RequirementUsage r) -> this.getThresholdOrObjective(r), String.CASE_INSENSITIVE_ORDER).reversed());
+                } else {
+                    requirementsElements.sort(Comparator.comparing((RequirementUsage r) -> this.getThresholdOrObjective(r), String.CASE_INSENSITIVE_ORDER));
+                }
+            } else if ("Category".equals(colSort.id())) {
+                if (colSort.desc()) {
+                    requirementsElements.sort(Comparator.comparing((RequirementUsage r) -> this.getCategory(r), String.CASE_INSENSITIVE_ORDER).reversed());
+                } else {
+                    requirementsElements.sort(Comparator.comparing((RequirementUsage r) -> this.getCategory(r), String.CASE_INSENSITIVE_ORDER));
                 }
             }
         }
@@ -244,6 +433,31 @@ public class RTVQueryServices {
         // check documentation body
         var documentationBody = this.getDocumentationBody(requirementUsage);
         if (!isValid && documentationBody != null && documentationBody.contains(globalFilterData)) {
+            isValid = true;
+        }
+        // check verification procedure id (cheap: reads this requirement's own metadata, no resource-set scan)
+        var verificationProcedureId = this.getVerificationProcedureId(requirementUsage);
+        if (!isValid && verificationProcedureId != null && verificationProcedureId.contains(globalFilterData)) {
+            isValid = true;
+        }
+        // check parent requirement ids (cheap: reads this requirement's own owned relationships only)
+        var parentRequirementIds = this.getParentRequirementIds(requirementUsage);
+        if (!isValid && parentRequirementIds.contains(globalFilterData)) {
+            isValid = true;
+        }
+        // check requirement type (cheap: a handful of library lookups per row, no resource-set scan)
+        var requirementType = this.getRequirementType(requirementUsage);
+        if (!isValid && requirementType.contains(globalFilterData)) {
+            isValid = true;
+        }
+        // check threshold or objective
+        var thresholdOrObjective = this.getThresholdOrObjective(requirementUsage);
+        if (!isValid && thresholdOrObjective.contains(globalFilterData)) {
+            isValid = true;
+        }
+        // check category
+        var category = this.getCategory(requirementUsage);
+        if (!isValid && category != null && category.contains(globalFilterData)) {
             isValid = true;
         }
         return isValid;

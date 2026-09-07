@@ -42,6 +42,10 @@ public class RTVTableDescriptionProvider implements IRepresentationDescriptionPr
 
     public static final String DESCRIPTION_NAME = "Requirements Table View";
 
+    private static final String NEW_VALUE = "newValue";
+
+    private static final String NEW_VALUE_EXPRESSION = "aql:newValue";
+
     private final TableBuilders tableBuilders = new TableBuilders();
 
     private final ViewBuilders viewBuilders = new ViewBuilders();
@@ -107,14 +111,71 @@ public class RTVTableDescriptionProvider implements IRepresentationDescriptionPr
                 .isSortableExpression(AQLConstants.AQL_TRUE)
                 .build();
 
+        var verificationProcedureIdColumnDescription = this.tableBuilders.newColumnDescription()
+                .name("RTV-ColumnDescription-VerificationProcedureId")
+                .semanticCandidatesExpression("aql:'VerificationProcedureId'")
+                .headerLabelExpression("Verification Procedure ID")
+                .initialWidthExpression("200")
+                .isResizableExpression(AQLConstants.AQL_TRUE)
+                .isSortableExpression(AQLConstants.AQL_TRUE)
+                .build();
+
+        var parentRequirementsColumnDescription = this.tableBuilders.newColumnDescription()
+                .name("RTV-ColumnDescription-ParentRequirements")
+                .semanticCandidatesExpression("aql:'ParentRequirements'")
+                .headerLabelExpression("Parent Requirements")
+                .initialWidthExpression("200")
+                .isResizableExpression(AQLConstants.AQL_TRUE)
+                .isSortableExpression(AQLConstants.AQL_TRUE)
+                .build();
+
+        var requirementTypeColumnDescription = this.tableBuilders.newColumnDescription()
+                .name("RTV-ColumnDescription-RequirementType")
+                .semanticCandidatesExpression("aql:'RequirementType'")
+                .headerLabelExpression("Requirement Type")
+                .initialWidthExpression("150")
+                .isResizableExpression(AQLConstants.AQL_TRUE)
+                .isSortableExpression(AQLConstants.AQL_TRUE)
+                .build();
+
+        var thresholdOrObjectiveColumnDescription = this.tableBuilders.newColumnDescription()
+                .name("RTV-ColumnDescription-ThresholdOrObjective")
+                .semanticCandidatesExpression("aql:'ThresholdOrObjective'")
+                .headerLabelExpression("Threshold or Objective")
+                .initialWidthExpression("150")
+                .isResizableExpression(AQLConstants.AQL_TRUE)
+                .isSortableExpression(AQLConstants.AQL_TRUE)
+                .build();
+
+        var categoryColumnDescription = this.tableBuilders.newColumnDescription()
+                .name("RTV-ColumnDescription-Category")
+                .semanticCandidatesExpression("aql:'Category'")
+                .headerLabelExpression("Category")
+                .initialWidthExpression("150")
+                .isResizableExpression(AQLConstants.AQL_TRUE)
+                .isSortableExpression(AQLConstants.AQL_TRUE)
+                .build();
+
         columns.add(declaredNameColumnDescription);
         columns.add(reqIdColumnDescription);
         columns.add(docColumnDescription);
+        columns.add(verificationProcedureIdColumnDescription);
+        columns.add(parentRequirementsColumnDescription);
+        columns.add(requirementTypeColumnDescription);
+        columns.add(thresholdOrObjectiveColumnDescription);
+        columns.add(categoryColumnDescription);
 
         return columns;
     }
 
     private List<CellDescription> createCells() {
+        List<CellDescription> cells = new ArrayList<>();
+        cells.addAll(this.createBaseCells());
+        cells.addAll(this.createRequirementAttributeCells());
+        return cells;
+    }
+
+    private List<CellDescription> createBaseCells() {
         List<CellDescription> cells = new ArrayList<>();
 
         var declaredNameCellDescription = this.tableBuilders.newCellDescription()
@@ -124,7 +185,7 @@ public class RTVTableDescriptionProvider implements IRepresentationDescriptionPr
                 .cellWidgetDescription(this.tableBuilders.newCellTextfieldWidgetDescription()
                         .body(this.viewBuilders.newSetValue()
                                 .featureName("declaredName")
-                                .valueExpression("aql:newValue")
+                                .valueExpression(NEW_VALUE_EXPRESSION)
                                 .build())
                         .build())
                 .build();
@@ -136,7 +197,7 @@ public class RTVTableDescriptionProvider implements IRepresentationDescriptionPr
                 .cellWidgetDescription(this.tableBuilders.newCellTextfieldWidgetDescription()
                         .body(this.viewBuilders.newSetValue()
                                 .featureName("reqId")
-                                .valueExpression("aql:newValue")
+                                .valueExpression(NEW_VALUE_EXPRESSION)
                                 .build())
                         .build())
                 .build();
@@ -147,7 +208,22 @@ public class RTVTableDescriptionProvider implements IRepresentationDescriptionPr
                 .valueExpression("aql:self.getDocumentationBody()")
                 .cellWidgetDescription(this.tableBuilders.newCellTextareaWidgetDescription()
                         .body(this.viewBuilders.newChangeContext()
-                                .expression(ServiceMethod.of1(RTVMutationServices::editDocumentation).aqlSelf("newValue"))
+                                .expression(ServiceMethod.of1(RTVMutationServices::editDocumentation).aqlSelf(NEW_VALUE))
+                                .build())
+                        .build())
+                .build();
+
+        // Displays the linked verification case's procedure ID, but is edited by typing the verification
+        // case's declared name (not the procedure ID itself) -- editing this cell links the requirement to a
+        // different verification case, entirely via VerificationLink (see that metadata's Javadoc). Zero or
+        // more than one matching case rejects the edit rather than guessing.
+        var verificationProcedureIdCellDescription = this.tableBuilders.newCellDescription()
+                .name("RTV-CellDescription-VerificationProcedureId")
+                .preconditionExpression("aql:columnTargetObject == 'VerificationProcedureId'")
+                .valueExpression(ServiceMethod.of0(RTVQueryServices::getVerificationProcedureId).aqlSelf())
+                .cellWidgetDescription(this.tableBuilders.newCellTextfieldWidgetDescription()
+                        .body(this.viewBuilders.newChangeContext()
+                                .expression(ServiceMethod.of2(RTVMutationServices::setVerificationLink).aqlSelf(NEW_VALUE, IEditingContext.EDITING_CONTEXT))
                                 .build())
                         .build())
                 .build();
@@ -155,6 +231,70 @@ public class RTVTableDescriptionProvider implements IRepresentationDescriptionPr
         cells.add(declaredNameCellDescription);
         cells.add(reqIdCellDescription);
         cells.add(docCellDescription);
+        cells.add(verificationProcedureIdCellDescription);
+
+        return cells;
+    }
+
+    private List<CellDescription> createRequirementAttributeCells() {
+        List<CellDescription> cells = new ArrayList<>();
+
+        // Displays the current parents' reqIds, comma-separated; edited by typing a comma-separated list of
+        // parent reqIds, entirely via a Dependency relationship (see RTVQueryServices.getParentRequirementIds's
+        // Javadoc). Any identifier that fails to resolve to exactly one other requirement rejects the whole edit.
+        var parentRequirementsCellDescription = this.tableBuilders.newCellDescription()
+                .name("RTV-CellDescription-ParentRequirements")
+                .preconditionExpression("aql:columnTargetObject == 'ParentRequirements'")
+                .valueExpression(ServiceMethod.of0(RTVQueryServices::getParentRequirementIds).aqlSelf())
+                .cellWidgetDescription(this.tableBuilders.newCellTextfieldWidgetDescription()
+                        .body(this.viewBuilders.newChangeContext()
+                                .expression(ServiceMethod.of2(RTVMutationServices::setParentRequirements).aqlSelf(NEW_VALUE, IEditingContext.EDITING_CONTEXT))
+                                .build())
+                        .build())
+                .build();
+
+        // Classifies the requirement by specializing one of the standard library's Requirements::*RequirementCheck
+        // definitions (see RTVRequirementTypeMapping's Javadoc) -- accepts Functional, Interface, Performance,
+        // Physical, or Design Constraint, case-insensitively.
+        var requirementTypeCellDescription = this.tableBuilders.newCellDescription()
+                .name("RTV-CellDescription-RequirementType")
+                .preconditionExpression("aql:columnTargetObject == 'RequirementType'")
+                .valueExpression(ServiceMethod.of0(RTVQueryServices::getRequirementType).aqlSelf())
+                .cellWidgetDescription(this.tableBuilders.newCellTextfieldWidgetDescription()
+                        .body(this.viewBuilders.newChangeContext()
+                                .expression(ServiceMethod.of1(RTVMutationServices::setRequirementType).aqlSelf(NEW_VALUE))
+                                .build())
+                        .build())
+                .build();
+
+        // Accepts Threshold/Objective (or the underlying threshold/objective literal), case-insensitively, via
+        // this project's ThresholdOrObjective metadata (see RequirementAttributesLibrary's Javadoc).
+        var thresholdOrObjectiveCellDescription = this.tableBuilders.newCellDescription()
+                .name("RTV-CellDescription-ThresholdOrObjective")
+                .preconditionExpression("aql:columnTargetObject == 'ThresholdOrObjective'")
+                .valueExpression(ServiceMethod.of0(RTVQueryServices::getThresholdOrObjective).aqlSelf())
+                .cellWidgetDescription(this.tableBuilders.newCellTextfieldWidgetDescription()
+                        .body(this.viewBuilders.newChangeContext()
+                                .expression(ServiceMethod.of2(RTVMutationServices::setThresholdOrObjective).aqlSelf(NEW_VALUE, IEditingContext.EDITING_CONTEXT))
+                                .build())
+                        .build())
+                .build();
+
+        var categoryCellDescription = this.tableBuilders.newCellDescription()
+                .name("RTV-CellDescription-Category")
+                .preconditionExpression("aql:columnTargetObject == 'Category'")
+                .valueExpression(ServiceMethod.of0(RTVQueryServices::getCategory).aqlSelf())
+                .cellWidgetDescription(this.tableBuilders.newCellTextfieldWidgetDescription()
+                        .body(this.viewBuilders.newChangeContext()
+                                .expression(ServiceMethod.of2(RTVMutationServices::setCategory).aqlSelf(NEW_VALUE, IEditingContext.EDITING_CONTEXT))
+                                .build())
+                        .build())
+                .build();
+
+        cells.add(parentRequirementsCellDescription);
+        cells.add(requirementTypeCellDescription);
+        cells.add(thresholdOrObjectiveCellDescription);
+        cells.add(categoryCellDescription);
 
         return cells;
     }
