@@ -116,6 +116,11 @@
 			</dependency>
 			<dependency>
 				<groupId>org.eclipse.syson</groupId>
+				<artifactId>syson-requirements-library</artifactId>
+				<version>${syson.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.syson</groupId>
 				<artifactId>syson-services</artifactId>
 				<version>${syson.version}</version>
 			</dependency>
