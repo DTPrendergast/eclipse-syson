@@ -81,6 +81,14 @@ import reactor.test.StepVerifier;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class SysONExplorerTests extends AbstractIntegrationTests {
 
+    /**
+     * Number of documents at the root of the Sirius Web default explorer: upstream's 95 standard
+     * SysML and KerML library documents plus the three model libraries this fork ships
+     * (VerificationProcedure, OperationalConcept, RequirementAttributes - plan.md items 1, 2 and 3),
+     * which is why this expectation deliberately differs from the upstream version of this test.
+     */
+    private static final int EXPECTED_ROOT_DOCUMENT_COUNT = 95 + 3;
+
     @Autowired
     private IGivenInitialServerState givenInitialServerState;
 
@@ -467,7 +475,7 @@ public class SysONExplorerTests extends AbstractIntegrationTests {
             assertThat(tree).isNotNull();
             treeId.set(tree.getId());
             // SysML and KerML libraries are at the root of the tree in the Sirius Web explorer.
-            assertThat(tree.getChildren()).hasSize(95);
+            assertThat(tree.getChildren()).hasSize(EXPECTED_ROOT_DOCUMENT_COUNT);
             Optional<TreeItem> optionalSysmlv2DocumentTreeItem = tree.getChildren().stream()
                     .filter(treeItem -> Objects.equals(treeItem.getLabel().toString(), "SysMLv2"))
                     .findFirst();

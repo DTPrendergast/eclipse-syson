@@ -96,6 +96,14 @@ import reactor.test.StepVerifier;
 public class ExplorerViewControllerIntegrationTests extends AbstractIntegrationTests {
 
     /**
+     * The representation descriptions offered on a Package, in the order the query returns them. The
+     * first five are upstream's; "Verification Table View" is added by this fork (plan.md item 1),
+     * which is why this expectation deliberately differs from the upstream version of this test.
+     */
+    private static final List<String> EXPECTED_PACKAGE_REPRESENTATION_LABELS = List.of("General View", "Action Flow View", "Interconnection View", "Requirements Table View",
+            "State Transition View", "Verification Table View");
+
+    /**
      * Record used to contain both a way to find a tree item and some predicate to validate on said tree item in order
      * to simplify the design of some advanced tests.
      *
@@ -212,11 +220,11 @@ public class ExplorerViewControllerIntegrationTests extends AbstractIntegrationT
         assertThat(endCursor).isNotBlank();
 
         int count = JsonPath.read(result.data(), "$.data.viewer.editingContext.representationDescriptions.pageInfo.count");
-        assertThat(count).isEqualTo(5);
+        assertThat(count).isEqualTo(EXPECTED_PACKAGE_REPRESENTATION_LABELS.size());
 
         List<String> representationLabels = JsonPath.read(result.data(), "$.data.viewer.editingContext.representationDescriptions.edges[*].node.label");
-        assertThat(representationLabels).hasSize(5);
-        assertThat(representationLabels).contains("General View", "Action Flow View", "Interconnection View", "Requirements Table View", "State Transition View");
+        assertThat(representationLabels).hasSize(EXPECTED_PACKAGE_REPRESENTATION_LABELS.size());
+        assertThat(representationLabels).containsAll(EXPECTED_PACKAGE_REPRESENTATION_LABELS);
     }
 
     @DisplayName("GIVEN the SysON Explorer View, WHEN we direct edit a ViewUsage typed with a standard diagram, THEN the type of ViewUsage is not part of the initial value of the direct edit")

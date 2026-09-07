@@ -74,6 +74,14 @@ public class RequirementsTableControllerIntegrationTests extends AbstractIntegra
     public static final String REQUIREMENT_2_LABEL = "requirement2";
     public static final String REQUIREMENT_1_LABEL = "requirement1";
 
+    /**
+     * The columns the requirements table renders, in order. The first three are upstream's; the
+     * last five are added by this fork (plan.md items 3a and 3b), which is why this assertion
+     * deliberately differs from the upstream version of this test.
+     */
+    private static final List<String> EXPECTED_COLUMN_HEADERS = List.of("DeclaredName", "ReqId", "Documentation", "Verification Procedure ID", "Parent Requirements",
+            "Requirement Type", "Threshold or Objective", "Category");
+
     @Autowired
     private IGivenInitialServerState givenInitialServerState;
 
@@ -140,13 +148,11 @@ public class RequirementsTableControllerIntegrationTests extends AbstractIntegra
         Consumer<Object> tableContentConsumer = assertRefreshedTableThat(table -> {
             assertThat(table).isNotNull();
 
-            assertThat(table.getColumns()).hasSize(3);
-            assertThat(table.getColumns().get(0).getHeaderLabel()).isEqualTo("DeclaredName");
-            assertThat(table.getColumns().get(0).getHeaderIndexLabel()).isEqualTo("");
-            assertThat(table.getColumns().get(1).getHeaderLabel()).isEqualTo("ReqId");
-            assertThat(table.getColumns().get(1).getHeaderIndexLabel()).isEqualTo("");
-            assertThat(table.getColumns().get(2).getHeaderLabel()).isEqualTo("Documentation");
-            assertThat(table.getColumns().get(2).getHeaderIndexLabel()).isEqualTo("");
+            // The three columns upstream ships, followed by the five this fork adds; see plan.md
+            // items 3a and 3b.
+            assertThat(table.getColumns()).hasSize(EXPECTED_COLUMN_HEADERS.size());
+            assertThat(table.getColumns()).extracting(column -> column.getHeaderLabel()).containsExactlyElementsOf(EXPECTED_COLUMN_HEADERS);
+            assertThat(table.getColumns()).allSatisfy(column -> assertThat(column.getHeaderIndexLabel()).isEqualTo(""));
 
             assertThat(table.getLines()).hasSize(0);
         });
@@ -168,13 +174,11 @@ public class RequirementsTableControllerIntegrationTests extends AbstractIntegra
         Consumer<Object> tableContentConsumer = assertRefreshedTableThat(table -> {
             assertThat(table).isNotNull();
 
-            assertThat(table.getColumns()).hasSize(3);
-            assertThat(table.getColumns().get(0).getHeaderLabel()).isEqualTo("DeclaredName");
-            assertThat(table.getColumns().get(0).getHeaderIndexLabel()).isEqualTo("");
-            assertThat(table.getColumns().get(1).getHeaderLabel()).isEqualTo("ReqId");
-            assertThat(table.getColumns().get(1).getHeaderIndexLabel()).isEqualTo("");
-            assertThat(table.getColumns().get(2).getHeaderLabel()).isEqualTo("Documentation");
-            assertThat(table.getColumns().get(2).getHeaderIndexLabel()).isEqualTo("");
+            // The three columns upstream ships, followed by the five this fork adds; see plan.md
+            // items 3a and 3b.
+            assertThat(table.getColumns()).hasSize(EXPECTED_COLUMN_HEADERS.size());
+            assertThat(table.getColumns()).extracting(column -> column.getHeaderLabel()).containsExactlyElementsOf(EXPECTED_COLUMN_HEADERS);
+            assertThat(table.getColumns()).allSatisfy(column -> assertThat(column.getHeaderIndexLabel()).isEqualTo(""));
 
             assertThat(table.getLines()).hasSize(0);
         });
