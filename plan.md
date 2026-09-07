@@ -410,6 +410,22 @@ anywhere in item 3: interactively exercising the table in a browser (standing ca
 out per-task above) and an actual export→reimport round trip through the app rather than at
 the unit level.
 
+**Correction (2026-09-07): the "full reactor build green" claims above were wrong, and item 3
+shipped red.** Those runs covered the view and library modules only. They never ran
+`syson-application`'s integration tests, which is where the requirements table is exercised
+end to end — and two of them
+(`RequirementsTableControllerIntegrationTests.givenRequirementsViewTableDescription...` and
+`givenNewRequirementsViewTableDescription...`) were failing on `Expected size: 3 but was: 8`
+from the moment 3a/3b added columns. The failure was correct: the assertions encoded
+upstream's three-column table. They now assert this fork's eight columns, via a named
+constant explaining why the expectation deliberately diverges from upstream.
+
+**The lesson, which applies to every future item:** module-level tests passing is not the
+same as the build being green. A change to a representation description is only really
+exercised by the integration tests in `syson-application`, which are slow enough to be easy
+to skip and are not run by building the module you edited. Run them before claiming a
+feature is done.
+
 ---
 
 ## 4. AI modeling assistant
@@ -421,10 +437,119 @@ the unit level.
 3. Deriving system-level requirements
 4. Defining high level-architectures using SysML v2 General and Interconnection Views
 5. Deriving subsystem and component requirements
-6. Creating class diagrams and defining class functions and software messages
+6. Defining classes, class functions and software messages
 7. Designing verification procedures and linking them to requirements
 
-**Current state.** Nothing. No LLM integration anywhere in the tree.
+**Current state.** No code. No LLM integration anywhere in the tree. What exists so far is
+scoping research (2026-09-06), recorded below.
+
+**Research findings (2026-09-06).** All checked against the tree or the real parse pipeline,
+not assumed:
+
+1. **The textual write path reaches diagrams, so goal 4 needs no diagram-specific write
+   API.** SysON diagrams render only elements explicitly *exposed*: every node tool calls
+   `DiagramMutationExposeService.expose`, which stores a `MembershipExpose` on the
+   `ViewUsage` (`DiagramMutationExposeService.java:139`). `expose` is a real SysML v2
+   keyword (`SysMLv2Keywords:199`) and `SysMLElementSerializer` writes it (line 2386), so an
+   agent can emit a `ViewUsage` with `expose` statements textually and get a populated
+   General or Interconnection View. Layout is not in the semantic model — Sirius Web owns
+   node positions — so the agent controls diagram *content*, not arrangement.
+   **The failure mode to design against:** create elements without exposing them and the
+   user opens a diagram to find it empty, which reads as a broken feature rather than a
+   missing statement.
+2. **Goal 6 is text-only and the mapping is verified.** A software-flavoured model
+   (`port def`, `part def` with `attribute` + visibility, `port`, `action`, `flow`) parses
+   with zero reports and survives a two-generation round trip (parse → serialize → reparse)
+   with metaclasses intact. Mapping: class → `part def` (or `item def` for pure data);
+   field → `attribute`, with `private`/`protected`/`public` honoured; method → `action`;
+   message → `flow`. `message x from a to b;` is also accepted and produces a `FlowUsage`,
+   serialized back as `flow`. `doc /* ... */` bodies round-trip inline, so structure and
+   narrative come from one generation pass. Note there is **no `class`/`struct`/`datatype`
+   keyword** in SysML v2 concrete syntax — `Class`/`Structure`/`DataType` exist only as
+   KerML-layer metaclasses and are not textually authorable — and no `Message` metaclass
+   at all.
+3. **`calc` is silently lossy — avoid emitting it.** `calc name : Type;` parses correctly as
+   a `CalculationUsage`, then serializes as `action` and reparses as an `ActionUsage`:
+   `SysMLElementSerializer` has no `caseCalculationUsage` and falls through to
+   `caseActionUsage`. Zero parse reports at every step, same silent-failure signature as the
+   reserved `objective` keyword and the unescapable quote from item 3. Emit
+   `action name : ReturnType` instead. This is an upstream serializer gap, not ours, and it
+   means the cross-cutting "export/reimport is lossless" check fails today for any model
+   using `calc`, independent of this item. Worth reporting upstream.
+
+**Decisions taken (2026-09-07).**
+
+- **The pipeline is two-phase, and that is forced by the platform, not a preference.** Every
+  GraphQL mutation is dispatched through `IEditingContextDispatcher` to the project's
+  `EditingContextEventProcessor`, which holds a single `ExecutorService` — and
+  `SiriusWebStarterConfiguration` builds it with `Executors.newSingleThreadExecutor()`
+  (confirmed in the bytecode; no sources jar ships). An LLM call inside a mutation handler
+  would therefore block *every* edit to that project, for every user, for the length of the
+  call. So: a fast dispatched read to serialize the scope, the LLM call off that thread
+  entirely, then a fast dispatched mutation to apply accepted items. The proposal has to
+  live somewhere between those phases.
+- **Proposals are persisted** (chosen over in-memory or in-model). An expensive generation
+  survives a refresh or restart, a proposal can be reviewed by someone other than its
+  requester, and unattended generation becomes additive rather than a rewrite. In-model
+  storage was rejected because unapproved content would live in the model and item 2 already
+  established that the explorer's filter extension point is not pluggable, so hiding it
+  would mean upstream edits.
+- **This settles the "or automate" tension.** Automate the mechanics; keep the merge gated.
+  The review gate is a property of the schema (nothing is applied until items are accepted
+  one by one), not of a particular UI.
+- **Inference goes to the Anthropic API**, official Java SDK (`com.anthropic:anthropic-java`),
+  default model `claude-opus-5`, credentials via Spring properties and environment variables.
+- **Acceptance stays scoped to one slice** — goal 3 only, rather than expanding to all seven.
+
+**Built so far — `backend/services/syson-ai-services` (persistence slice only).**
+
+The proposal store: `ai_proposal` + `ai_proposal_item`, per-item status so individual
+accept/reject is a property of the data rather than of the UI, and prompt/model/author/
+timestamps as the provenance that must survive onto generated elements. Verified against a
+real PostgreSQL (Testcontainers), not a substitute: the changelog applies, the Spring Data
+JDBC mapping matches it, the child collection round-trips, and per-item decisions drive the
+proposal's derived status.
+
+Two platform integration traps found and handled, both of which fail silently at runtime:
+
+1. **Never publish a `SpringLiquibase` bean.** Boot's
+   `LiquibaseAutoConfiguration$LiquibaseConfiguration` is
+   `@ConditionalOnMissingBean(SpringLiquibase.class)`, so declaring one of our own would
+   switch off the platform's migration and the entire Sirius Web schema would stop being
+   created — first visible as a missing table at runtime, long after our own tables looked
+   fine. `SysONAiDatabaseMigration` constructs one locally instead and drives it, ordering
+   itself after the platform's via an `ObjectProvider`. `SysONAiSchemaCoexistenceTests`
+   asserts both schemas and both changelog tracking tables exist, so a future "simplification"
+   fails loudly.
+   The platform's own `db/db.changelog-master.xml` (inside `sirius-web-infrastructure`) is a
+   fixed `<include>` list with no `includeAll` and no extension hook, which is why we run a
+   separate changelog rather than contributing to theirs.
+2. **`@EnableJdbcRepositories` is scoped to `org.eclipse.sirius.web.domain`**, so our
+   repositories need their own. Unlike the Liquibase case this is purely additive.
+
+One more gotcha worth knowing: the shared `@SpringJUnitConfig` context behind
+`AbstractIntegrationTests` never loads `application.properties`, so
+`spring.liquibase.change-log` is unset there and Boot's Liquibase falls back to a default
+path that does not exist. Anything touching the datasource has to be a full
+`@SpringBootTest(webEnvironment = RANDOM_PORT)` — the recipe already used by
+`SysMLMoveElementServiceDelegateIntegrationTests`.
+
+**Still to build:** model-scope serialization (read path), the Anthropic client and prompt
+assembly, response validation through `ISysMLTextImporter`, the GraphQL mutations, a
+provenance metadata library (`@Generated { by, prompt, at }`, same shape as items 1–3), and
+the review/diff UI.
+
+**Sequencing.** The seven goals share one pipeline — scope selection → serialize context →
+LLM call → parse and validate returned SysML → diff → apply with provenance — and differ
+only in prompt, scoping strategy, and output shape. Build the pipeline once, then add thin
+task adapters; this is not seven features. Start with **goal 3 (derived requirements)**: it
+is the best-defined and already has the acceptance criterion. Goal 1 (ConOps) is tempting
+because the chain starts there, but free narrative is the hardest output to validate, so
+starting there means building the pipeline with the weakest test of whether it works.
+Goal 7 is cheapest (item 3a already built the read/write services) but every generated link
+inherits the non-standard `VerificationLink`, scaling the eventual migration cost.
+Provenance has a known-good pattern: a `MetadataDefinition` in a model library
+(`@Generated { by, prompt, at }`), same shape and loading trick as items 1-3.
 
 **Enabling modules.** Two things make this far more tractable than it looks:
 
