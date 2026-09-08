@@ -733,7 +733,23 @@ single-threaded executor for no benefit. And the field is named `pendingAiPropos
 is what it returns: applied and rejected proposals stay as history, and handing those to a review
 UI would offer to apply work that has already been applied.
 
-**Still to build:** refusal fallbacks on the Anthropic client.
+**Refusal fallbacks are wired, through an escape hatch.** On a policy decline the API re-runs
+the request on a fallback model within the same call instead of returning nothing.
+`anthropic-java` 2.34.0 has **no typed binding for this** — checked, not assumed: there is no
+class with "fallback" in its name anywhere in the jar, and no such constant on `AnthropicBeta`.
+So it goes on as `addBeta("server-side-fallback-2026-06-01")` plus a raw
+`putAdditionalBodyProperty("fallbacks", …)` using the documented wire shape, and the client moves
+to the beta messages endpoint. Configurable via `syson.ai.fallback-model` (default
+`claude-opus-4-8`; empty turns it off).
+
+Because that body property is untypechecked, the tests assert the request actually carries the
+beta flag and the correctly shaped property — which can be done without an API key. If a later
+SDK version adds a typed API, this is the thing to replace.
+
+**Item 4 backend and UI are complete.** What has never happened is a single real API call: there
+is no key configured in this environment, so every test to date stubs the model call. Prompt
+quality, the validator's strictness against real model output, and the fallback wire shape are
+all unverified against the live API. That is the next thing to do, and it needs a key.
 
 **Sequencing.** The seven goals share one pipeline — scope selection → serialize context →
 LLM call → parse and validate returned SysML → diff → apply with provenance — and differ

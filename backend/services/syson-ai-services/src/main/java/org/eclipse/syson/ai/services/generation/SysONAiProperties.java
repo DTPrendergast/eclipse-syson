@@ -44,6 +44,16 @@ public class SysONAiProperties {
      */
     private long maxTokens = 16000;
 
+    /**
+     * The model a refused request is retried on, server side.
+     *
+     * <p>
+     * Without this a policy refusal simply stops and the user gets nothing back. Set it to empty to
+     * turn the behaviour off.
+     * </p>
+     */
+    private String fallbackModel = "claude-opus-4-8";
+
     public String getApiKey() {
         return this.apiKey;
     }
@@ -58,6 +68,23 @@ public class SysONAiProperties {
 
     public void setModel(String model) {
         this.model = model;
+    }
+
+    public String getFallbackModel() {
+        return this.fallbackModel;
+    }
+
+    public void setFallbackModel(String fallbackModel) {
+        this.fallbackModel = fallbackModel;
+    }
+
+    /**
+     * Whether a refusal should be retried on another model.
+     *
+     * @return true when a fallback model is configured
+     */
+    public boolean hasFallbackModel() {
+        return this.fallbackModel != null && !this.fallbackModel.isBlank();
     }
 
     public long getMaxTokens() {

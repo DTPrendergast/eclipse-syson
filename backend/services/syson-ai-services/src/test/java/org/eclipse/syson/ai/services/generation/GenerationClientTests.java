@@ -51,6 +51,36 @@ class GenerationClientTests {
     }
 
     @Test
+    void sendsTheRefusalFallbackSoARefusedRequestIsRetriedRatherThanLost() {
+        var properties = new SysONAiProperties();
+        properties.setApiKey("sk-ant-test");
+        var client = new AnthropicGenerationClient(properties);
+
+        var params = client.paramsFor(new GenerationRequest("system", "user"));
+
+        // The SDK at this version has no typed binding for fallbacks, so this goes on as a raw
+        // body property. That makes the wire shape untypechecked, which is exactly why it is
+        // asserted here rather than assumed - and it can be asserted without an API key.
+        assertThat(params.betas()).isPresent();
+        assertThat(params.betas().get()).extracting(beta -> beta.toString()).contains("server-side-fallback-2026-06-01");
+        assertThat(params._additionalBodyProperties()).containsKey("fallbacks");
+        assertThat(params._additionalBodyProperties().get("fallbacks").toString()).contains("claude-opus-4-8");
+    }
+
+    @Test
+    void omitsTheFallbackEntirelyWhenItIsTurnedOff() {
+        var properties = new SysONAiProperties();
+        properties.setApiKey("sk-ant-test");
+        properties.setFallbackModel("");
+        var client = new AnthropicGenerationClient(properties);
+
+        var params = client.paramsFor(new GenerationRequest("system", "user"));
+
+        assertThat(params._additionalBodyProperties()).doesNotContainKey("fallbacks");
+        assertThat(params.betas()).isEmpty();
+    }
+
+    @Test
     void withoutAKeyItReportsNotConfiguredRatherThanThrowingOrReturningAnEmptyAnswer() {
         var client = new AnthropicGenerationClient(new SysONAiProperties());
 
