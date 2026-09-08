@@ -50,6 +50,17 @@ public class SysONAiGraphQLSchemaTests extends AbstractIntegrationTests {
     }
 
     @Test
+    public void aStoredProposalCanBeReadBack() {
+        var editingContextType = this.graphQLSchema.getObjectType("EditingContext");
+
+        // Without this field the proposal store would only ever be written to, and the reason for
+        // persisting a proposal at all - that an expensive generation survives a refresh and can
+        // be picked up by someone else - would not hold.
+        var field = editingContextType.getFieldDefinition("pendingAiProposals");
+        assertThat(field).as("the proposal read-back field is missing").isNotNull();
+    }
+
+    @Test
     public void theGeneratePayloadIsAUnionThatCanCarryAnError() {
         var payloadType = this.graphQLSchema.getType("GenerateDerivedRequirementsPayload");
 

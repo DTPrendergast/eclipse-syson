@@ -64,6 +64,35 @@ export interface GQLApplyAiProposalItemVariables {
   };
 }
 
+export interface GQLAiProposalItem {
+  id: string;
+  label: string;
+  sysmlFragment: string;
+  status: string;
+}
+
+export interface GQLAiProposal {
+  id: string;
+  taskKind: string;
+  prompt: string;
+  modelId: string;
+  createdBy: string;
+  createdOn: string;
+  items: GQLAiProposalItem[];
+}
+
+export interface GQLPendingAiProposalsData {
+  viewer: {
+    editingContext: {
+      pendingAiProposals: GQLAiProposal[];
+    } | null;
+  };
+}
+
+export interface GQLPendingAiProposalsVariables {
+  editingContextId: string;
+}
+
 /**
  * Where a candidate has got to in this dialog. "rejected" is local: rejecting a candidate simply
  * means never applying it, and nothing about the model changes.

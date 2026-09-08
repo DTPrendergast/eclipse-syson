@@ -10,7 +10,7 @@
  * Contributors:
  *     Obeo - initial API and implementation
  *******************************************************************************/
-import { gql, useMutation } from '@apollo/client';
+import { gql, useMutation, useQuery } from '@apollo/client';
 import { useSelection } from '@eclipse-sirius/sirius-components-core';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
@@ -23,13 +23,16 @@ import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  GQLAiProposal,
   GQLApplyAiProposalItemData,
   GQLApplyAiProposalItemVariables,
   GQLGenerateDerivedRequirementsData,
   GQLGenerateDerivedRequirementsSuccessPayload,
   GQLGenerateDerivedRequirementsVariables,
+  GQLPendingAiProposalsData,
+  GQLPendingAiProposalsVariables,
   GQLProposedItem,
   ItemDecision,
   SysONAiReviewDialogProps,
@@ -51,6 +54,26 @@ const generateDerivedRequirementsMutation = gql`
       }
       ... on ErrorPayload {
         message
+      }
+    }
+  }
+`;
+
+const pendingAiProposalsQuery = gql`
+  query pendingAiProposals($editingContextId: ID!) {
+    viewer {
+      editingContext(editingContextId: $editingContextId) {
+        pendingAiProposals {
+          id
+          prompt
+          createdOn
+          items {
+            id
+            label
+            sysmlFragment
+            status
+          }
+        }
       }
     }
   }
@@ -83,6 +106,30 @@ export const SysONAiReviewDialog = ({ editingContextId, open, onClose }: SysONAi
   const [decisions, setDecisions] = useState<Record<string, ItemDecision>>({});
 
   const selectedIds: string[] = selection.entries.map((entry) => entry.id);
+
+  // A generation costs real money and real time, so an unreviewed one is picked back up rather
+  // than silently abandoned when the dialog is reopened or the page is refreshed.
+  const { data: pendingData } = useQuery<GQLPendingAiProposalsData, GQLPendingAiProposalsVariables>(
+    pendingAiProposalsQuery,
+    { variables: { editingContextId }, skip: !open, fetchPolicy: 'network-only' }
+  );
+
+  const pendingProposals: GQLAiProposal[] = pendingData?.viewer.editingContext?.pendingAiProposals ?? [];
+
+  useEffect(() => {
+    if (!open || proposalId !== null || pendingProposals.length === 0) {
+      return;
+    }
+    const mostRecent = pendingProposals[0]!;
+    setProposalId(mostRecent.id);
+    setItems(mostRecent.items.map((item) => ({ id: item.id, label: item.label, sysmlFragment: item.sysmlFragment })));
+    setDecisions(
+      Object.fromEntries(
+        mostRecent.items.map((item) => [item.id, item.status === 'APPLIED' ? 'applied' : 'pending'] as const)
+      )
+    );
+    setInstruction(mostRecent.prompt);
+  }, [open, proposalId, pendingProposals]);
 
   const [generate, { loading: generating }] = useMutation<
     GQLGenerateDerivedRequirementsData,
@@ -150,6 +197,9 @@ export const SysONAiReviewDialog = ({ editingContextId, open, onClose }: SysONAi
       <DialogTitle>Propose derived requirements</DialogTitle>
       <DialogContent>
         <Stack spacing={2}>
+          {proposalId !== null && !generating ? (
+            <Alert severity="info">Resumed an earlier proposal that had not been reviewed yet.</Alert>
+          ) : null}
           <Typography variant="body2" color="textSecondary">
             {selectedIds.length === 0
               ? 'Select one or more elements in the explorer to derive requirements from.'

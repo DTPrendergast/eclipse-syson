@@ -1,3 +1,24 @@
+extend type EditingContext {
+  pendingAiProposals: [AiProposal!]!
+}
+
+type AiProposal {
+  id: String!
+  taskKind: String!
+  prompt: String!
+  modelId: String!
+  createdBy: String!
+  createdOn: String!
+  items: [AiProposalItem!]!
+}
+
+type AiProposalItem {
+  id: String!
+  label: String!
+  sysmlFragment: String!
+  status: String!
+}
+
 extend type Mutation {
   generateDerivedRequirements(input: GenerateDerivedRequirementsInput!): GenerateDerivedRequirementsPayload!
   applyAiProposalItem(input: ApplyAiProposalItemInput!): ApplyAiProposalItemPayload!

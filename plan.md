@@ -720,12 +720,20 @@ changes.
 - **Author now records origin, not identity** (`ai-assistant`), which is what the user asked for:
   enough to tell generated content from hand-authored content. Identity remains unwired.
 
-**Known gap:** a proposal can only be reviewed in the dialog session that produced it. The rows
-persist, but there is no query to read one back, so a refresh loses the list — which undercuts
-part of why proposals are persisted at all. A `Query.aiProposal(id)` field and a "resume review"
-entry point close it.
+**Read-back closes the loop.** `EditingContext.pendingAiProposals` returns proposals still
+awaiting review, and the dialog resumes the most recent one when it opens. This is what makes
+persisting a proposal worth anything: a generation that cost real money and real time survives a
+refresh and can be picked up by someone other than whoever asked for it. Without it the store
+would only ever have been written to.
 
-**Still to build:** refusal fallbacks on the Anthropic client, and the read-back query above.
+Two decisions there. The fetcher reads the database **directly rather than through
+`IEditingContextDispatcher`** — a proposal is not model data, it lives in its own tables, so
+dispatching would queue a database query behind every pending edit on the project's
+single-threaded executor for no benefit. And the field is named `pendingAiProposals` because that
+is what it returns: applied and rejected proposals stay as history, and handing those to a review
+UI would offer to apply work that has already been applied.
+
+**Still to build:** refusal fallbacks on the Anthropic client.
 
 **Sequencing.** The seven goals share one pipeline — scope selection → serialize context →
 LLM call → parse and validate returned SysML → diff → apply with provenance — and differ
