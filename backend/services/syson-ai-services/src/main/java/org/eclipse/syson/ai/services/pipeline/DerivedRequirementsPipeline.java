@@ -22,12 +22,9 @@ import org.eclipse.syson.ai.services.generation.IGenerationClient;
 import org.eclipse.syson.ai.services.proposal.AiProposal;
 import org.eclipse.syson.ai.services.proposal.AiProposalItem;
 import org.eclipse.syson.ai.services.proposal.IAiProposalRepository;
-import org.eclipse.syson.ai.services.scope.ModelScopePolicy;
-import org.eclipse.syson.ai.services.scope.ModelScopeSelector;
-import org.eclipse.syson.ai.services.scope.ModelScopeSerializer;
+import org.eclipse.syson.ai.services.scope.SerializedModelScope;
 import org.eclipse.syson.ai.services.validation.GeneratedSysmlValidator;
 import org.eclipse.syson.ai.services.validation.ValidationResult;
-import org.eclipse.syson.sysml.Element;
 import org.eclipse.syson.sysml.RequirementUsage;
 import org.springframework.stereotype.Service;
 
@@ -35,12 +32,13 @@ import org.springframework.stereotype.Service;
  * Runs the derived-requirements pipeline: scope, serialize, generate, validate, persist.
  *
  * <p>
- * <b>Nothing here touches the model.</b> The pipeline reads the model to build context and writes
- * a proposal to the database; it never adds an element. That is the whole point of the two-phase
- * design recorded in plan.md - the platform dispatches every mutation through a single-threaded
- * executor per project, so an LLM call inside a mutation handler would block every edit for every
- * user for the length of the call. The seeds are read on that thread and handed here; applying an
- * accepted candidate is a separate, fast mutation later.
+ * <b>Nothing here touches the model - it cannot.</b> This takes an already-serialized scope rather
+ * than model elements, so there is no EMF object in reach and no way for a long-running model call
+ * to end up on the editing context's thread. That is the two-phase design from plan.md made
+ * structural rather than merely intended: the platform dispatches every mutation through one
+ * single-threaded executor per project, so an LLM call inside a mutation handler would block every
+ * edit for every user for the length of the call. Gathering the scope happens on that thread and
+ * finishes quickly; this runs off it; applying an accepted candidate is a separate fast mutation.
  * </p>
  *
  * <p>
@@ -57,10 +55,6 @@ public class DerivedRequirementsPipeline {
     /** Recorded on the proposal so a later run of a different goal is distinguishable. */
     public static final String TASK_KIND = "derived-requirements";
 
-    private final ModelScopeSelector selector;
-
-    private final ModelScopeSerializer serializer;
-
     private final DerivedRequirementsPromptFactory promptFactory;
 
     private final IGenerationClient generationClient;
@@ -69,10 +63,8 @@ public class DerivedRequirementsPipeline {
 
     private final IAiProposalRepository proposalRepository;
 
-    public DerivedRequirementsPipeline(ModelScopeSelector selector, ModelScopeSerializer serializer, DerivedRequirementsPromptFactory promptFactory,
-            IGenerationClient generationClient, GeneratedSysmlValidator validator, IAiProposalRepository proposalRepository) {
-        this.selector = Objects.requireNonNull(selector);
-        this.serializer = Objects.requireNonNull(serializer);
+    public DerivedRequirementsPipeline(DerivedRequirementsPromptFactory promptFactory, IGenerationClient generationClient, GeneratedSysmlValidator validator,
+            IAiProposalRepository proposalRepository) {
         this.promptFactory = Objects.requireNonNull(promptFactory);
         this.generationClient = Objects.requireNonNull(generationClient);
         this.validator = Objects.requireNonNull(validator);
@@ -84,20 +76,17 @@ public class DerivedRequirementsPipeline {
      *
      * @param projectId
      *            the project the seeds came from, recorded as provenance
-     * @param seeds
-     *            the elements the engineer selected, already read from the editing context
+     * @param scope
+     *            the model context, already gathered and serialized on the editing context's own
+     *            thread by the caller
      * @param instruction
      *            what the engineer asked for
      * @param author
      *            who asked, recorded as provenance
-     * @param policy
-     *            the scope limits to respect
      * @return what happened, including why there is nothing to review when there is nothing
      */
-    public GenerationOutcome run(String projectId, List<Element> seeds, String instruction, String author, ModelScopePolicy policy) {
-        var scope = this.selector.select(seeds, policy);
-        var serialized = this.serializer.serialize(scope, policy);
-        var request = this.promptFactory.create(serialized, instruction);
+    public GenerationOutcome run(String projectId, SerializedModelScope scope, String instruction, String author) {
+        var request = this.promptFactory.create(scope, instruction);
 
         GenerationResult generation = this.generationClient.generate(request);
         GenerationOutcome outcome;

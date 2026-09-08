@@ -31,7 +31,6 @@ import org.eclipse.syson.ai.services.proposal.AiProposalItem;
 import org.eclipse.syson.ai.services.proposal.AiProposalItemStatus;
 import org.eclipse.syson.application.configuration.SysONDefaultLibrariesConfiguration;
 import org.eclipse.syson.application.configuration.SysONLoadDefaultLibrariesOnApplicationStartConfiguration;
-import org.eclipse.syson.services.DeleteService;
 import org.eclipse.syson.sysml.ASTTransformer;
 import org.eclipse.syson.sysml.Element;
 import org.eclipse.syson.sysml.LiteralString;
@@ -66,7 +65,7 @@ class ProposalApplyServiceTests {
     private final IIdentityService identityService = mock(IIdentityService.class);
 
     private final ProposalApplyService applyService = new ProposalApplyService(
-            new SysideSysMLTextImporter(new SysmlToAst(null)), this.identityService, new DeleteService());
+            new SysideSysMLTextImporter(new SysmlToAst(null)), this.identityService);
 
     @Test
     void createsTheElementAndMarksTheItemApplied() {

@@ -1,0 +1,30 @@
+extend type Mutation {
+  generateDerivedRequirements(input: GenerateDerivedRequirementsInput!): GenerateDerivedRequirementsPayload!
+  applyAiProposalItem(input: ApplyAiProposalItemInput!): ApplyAiProposalItemPayload!
+}
+
+input GenerateDerivedRequirementsInput {
+  id: ID!
+  editingContextId: String!
+  elementIds: [String!]!
+  instruction: String!
+}
+
+type GenerateDerivedRequirementsSuccessPayload {
+  id: ID!
+  proposalId: String
+  candidateCount: Int!
+  problems: [String!]!
+}
+
+union GenerateDerivedRequirementsPayload = ErrorPayload | GenerateDerivedRequirementsSuccessPayload
+
+input ApplyAiProposalItemInput {
+  id: ID!
+  editingContextId: String!
+  proposalId: String!
+  itemId: String!
+  parentElementId: String!
+}
+
+union ApplyAiProposalItemPayload = ErrorPayload | SuccessPayload

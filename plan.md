@@ -673,8 +673,37 @@ and every other candidate from that run, which is both safer and more complete.
 so if it fails the element is deleted again and the item is not marked applied. Leaving a
 generated element behind without provenance is the exact failure the library exists to prevent.
 
-**Still to build:** the GraphQL mutations (a dispatched read to gather seeds, and one to apply
-accepted candidates) and the review/diff UI.
+**Built next — the GraphQL surface.**
+
+Two mutations, `generateDerivedRequirements` and `applyAiProposalItem`, plus the handlers behind
+them. The generate fetcher is where the two-phase design actually lives: the client sees one
+mutation, but reading the model is dispatched to the editing context (fast, and the only part
+that must happen there) while the model call runs on a bounded-elastic scheduler off that thread.
+`DerivedRequirementsPipeline` was refactored to take an already-serialized scope rather than
+model elements, so the threading rule is now structural — there is no EMF object in reach of the
+model call, so it cannot accidentally end up back on the single-threaded executor.
+
+Three things this cost, each a silent failure that booting the application does not catch:
+
+1. **A `.graphqls` file that is not picked up costs nothing at startup.** The application comes
+   up perfectly happily and the mutation simply does not exist, which a client discovers the
+   first time a user clicks the button. `SysONAiGraphQLSchemaTests` asserts both fields are in
+   the running schema.
+2. **`-pl <module>` does not install**, so `syson-application` was testing against a stale jar
+   of the AI module. Worth remembering for every future cross-module check in this fork: install
+   the module, or build with `-am`, before trusting an application-level test.
+3. **The generate payload has to be a union.** `IExceptionWrapper` turns a failed generation into
+   an `ErrorPayload`, so a plain object type would have failed at runtime on the error path only
+   — the path least likely to be exercised by hand.
+
+**Provenance carries no author yet, deliberately.** The input does not accept one: a
+client-supplied author would let a caller stamp anyone's name on generated content, which is
+worse than recording nothing because it looks authoritative. There is no server-side identity in
+this codebase to read (nothing uses `SecurityContextHolder`), so the author is recorded as
+`unknown` until that is wired. **This must be resolved before provenance here is treated as an
+audit record.**
+
+**Still to build:** the review/diff UI, and refusal fallbacks on the Anthropic client.
 
 **Sequencing.** The seven goals share one pipeline — scope selection → serialize context →
 LLM call → parse and validate returned SysML → diff → apply with provenance — and differ

@@ -83,8 +83,6 @@ class DerivedRequirementsPipelineTests {
     private final IGenerationClient generationClient = mock(IGenerationClient.class);
 
     private final DerivedRequirementsPipeline pipeline = new DerivedRequirementsPipeline(
-            new ModelScopeSelector(),
-            new ModelScopeSerializer(),
             new DerivedRequirementsPromptFactory(),
             this.generationClient,
             new GeneratedSysmlValidator(new SysmlToAst(null)),
@@ -192,9 +190,12 @@ class DerivedRequirementsPipelineTests {
     }
 
     private GenerationOutcome run() {
+        // The scope is gathered the way the query handler gathers it, then handed over as text -
+        // the pipeline never sees an EMF object.
         Element seed = this.find("enduranceRequirement");
-        return this.pipeline.run("project-1", List.of(seed), "Derive cell-level requirements for the battery.", "dtprendergast",
-                ModelScopePolicy.defaultPolicy());
+        var policy = ModelScopePolicy.defaultPolicy();
+        var scope = new ModelScopeSerializer().serialize(new ModelScopeSelector().select(List.of(seed), policy), policy);
+        return this.pipeline.run("project-1", scope, "Derive cell-level requirements for the battery.", "dtprendergast");
     }
 
     private void stubGeneration(String responseText) {

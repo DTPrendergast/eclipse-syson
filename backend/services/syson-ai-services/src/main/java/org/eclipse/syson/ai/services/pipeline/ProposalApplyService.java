@@ -71,12 +71,12 @@ public class ProposalApplyService {
 
     private final IIdentityService identityService;
 
-    private final DeleteService deleteService;
+    /** Constructed rather than injected: DeleteService is a plain stateless helper, not a bean, and this is how every other service in this fork obtains one. */
+    private final DeleteService deleteService = new DeleteService();
 
-    public ProposalApplyService(ISysMLTextImporter textImporter, IIdentityService identityService, DeleteService deleteService) {
+    public ProposalApplyService(ISysMLTextImporter textImporter, IIdentityService identityService) {
         this.textImporter = Objects.requireNonNull(textImporter);
         this.identityService = Objects.requireNonNull(identityService);
-        this.deleteService = Objects.requireNonNull(deleteService);
     }
 
     /**

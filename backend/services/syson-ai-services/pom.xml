@@ -59,6 +59,13 @@
 			<artifactId>liquibase-core</artifactId>
 		</dependency>
 
+		<!-- Main: the GraphQL mutation surface - data fetchers, editing-context dispatch and
+		     event handlers. Same dependency syson-sysml-import uses for its own data fetcher. -->
+		<dependency>
+			<groupId>org.eclipse.sirius</groupId>
+			<artifactId>sirius-web-application</artifactId>
+			<version>${sirius.web.version}</version>
+		</dependency>
 		<!-- Main: DeleteService, used to roll an element back out of the model when its
 		     provenance stamp fails to apply. -->
 		<dependency>

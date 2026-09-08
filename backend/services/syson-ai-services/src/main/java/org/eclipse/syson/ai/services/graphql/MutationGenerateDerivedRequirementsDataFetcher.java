@@ -1,0 +1,121 @@
+/*******************************************************************************
+ * Copyright (c) 2026 Obeo.
+ * This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v2.0
+ * which accompanies this distribution, and is available at
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *     Obeo - initial API and implementation
+ *******************************************************************************/
+package org.eclipse.syson.ai.services.graphql;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+
+import org.eclipse.sirius.components.annotations.spring.graphql.QueryDataFetcher;
+import org.eclipse.sirius.components.core.api.IPayload;
+import org.eclipse.sirius.components.graphql.api.IDataFetcherWithFieldCoordinates;
+import org.eclipse.sirius.components.graphql.api.IEditingContextDispatcher;
+import org.eclipse.sirius.components.graphql.api.IExceptionWrapper;
+import org.eclipse.syson.ai.services.graphql.dto.GatherModelScopeInput;
+import org.eclipse.syson.ai.services.graphql.dto.GatherModelScopePayload;
+import org.eclipse.syson.ai.services.graphql.dto.GenerateDerivedRequirementsInput;
+import org.eclipse.syson.ai.services.graphql.dto.GenerateDerivedRequirementsSuccessPayload;
+import org.eclipse.syson.ai.services.pipeline.DerivedRequirementsPipeline;
+import org.eclipse.syson.ai.services.scope.SerializedModelScope;
+
+import graphql.schema.DataFetchingEnvironment;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+import tools.jackson.databind.ObjectMapper;
+
+/**
+ * Data fetcher for the field Mutation#generateDerivedRequirements.
+ *
+ * <p>
+ * <b>This is where the two-phase design lives.</b> The client sees one mutation, but it runs as
+ * two very different pieces of work. Reading the model is dispatched to the editing context, where
+ * it has to happen and where it finishes in milliseconds. The model call is not: it is moved onto
+ * a bounded-elastic scheduler, off the editing context's thread entirely. The platform gives each
+ * project a single-threaded executor for its mutations
+ * ({@code Executors.newSingleThreadExecutor()} in {@code SiriusWebStarterConfiguration}), so a
+ * generation dispatched as an ordinary mutation would freeze every edit in the project, for every
+ * user, for as long as the model took to answer.
+ * </p>
+ *
+ * @author DTPrendergast
+ */
+@QueryDataFetcher(type = "Mutation", field = "generateDerivedRequirements")
+public class MutationGenerateDerivedRequirementsDataFetcher implements IDataFetcherWithFieldCoordinates<CompletableFuture<IPayload>> {
+
+    private static final String INPUT_ARGUMENT = "input";
+
+    /**
+     * Recorded as the author until the application has a server-side identity to read.
+     *
+     * <p>
+     * Deliberately not taken from the client. A caller-supplied author would let anyone stamp
+     * anyone's name onto generated content, which is worse than recording nothing because it looks
+     * authoritative. Wiring this to the authenticated principal is required before provenance here
+     * can be treated as an audit record.
+     * </p>
+     */
+    private static final String UNKNOWN_AUTHOR = "unknown";
+
+    private final ObjectMapper objectMapper;
+
+    private final IExceptionWrapper exceptionWrapper;
+
+    private final IEditingContextDispatcher editingContextDispatcher;
+
+    private final DerivedRequirementsPipeline pipeline;
+
+    public MutationGenerateDerivedRequirementsDataFetcher(ObjectMapper objectMapper, IExceptionWrapper exceptionWrapper, IEditingContextDispatcher editingContextDispatcher,
+            DerivedRequirementsPipeline pipeline) {
+        this.objectMapper = Objects.requireNonNull(objectMapper);
+        this.exceptionWrapper = Objects.requireNonNull(exceptionWrapper);
+        this.editingContextDispatcher = Objects.requireNonNull(editingContextDispatcher);
+        this.pipeline = Objects.requireNonNull(pipeline);
+    }
+
+    @Override
+    public CompletableFuture<IPayload> get(DataFetchingEnvironment environment) throws Exception {
+        Object argument = environment.getArgument(INPUT_ARGUMENT);
+        var input = this.objectMapper.convertValue(argument, GenerateDerivedRequirementsInput.class);
+
+        var gatherScope = new GatherModelScopeInput(UUID.randomUUID(), input.editingContextId(), input.elementIds());
+
+        Mono<IPayload> result = this.editingContextDispatcher.dispatchQuery(input.editingContextId(), gatherScope)
+                .flatMap(payload -> this.generate(input, payload));
+
+        return this.exceptionWrapper.wrapMono(() -> result, input).toFuture();
+    }
+
+    /**
+     * Runs the generation away from the editing context's thread.
+     */
+    private Mono<IPayload> generate(GenerateDerivedRequirementsInput input, IPayload scopePayload) {
+        Mono<IPayload> result = Mono.just(new GenerateDerivedRequirementsSuccessPayload(input.id(), null, 0, List.of("The model context could not be read.")));
+
+        if (scopePayload instanceof GatherModelScopePayload gathered) {
+            SerializedModelScope scope = gathered.scope();
+            result = Mono.fromCallable(() -> this.toPayload(input, scope))
+                    .subscribeOn(Schedulers.boundedElastic());
+        }
+        return result;
+    }
+
+    private IPayload toPayload(GenerateDerivedRequirementsInput input, SerializedModelScope scope) {
+        var outcome = this.pipeline.run(input.editingContextId(), scope, input.instruction(), UNKNOWN_AUTHOR);
+        String proposalId = null;
+        if (outcome.proposal().isPresent()) {
+            proposalId = outcome.proposal().get().toString();
+        }
+        return new GenerateDerivedRequirementsSuccessPayload(input.id(), proposalId, outcome.candidateCount(), outcome.problems());
+    }
+}
