@@ -642,9 +642,39 @@ validation all leave no reviewable artefact, because storing candidates that fai
 would invite someone to apply them later. A model that correctly proposes nothing is reported
 as "nothing to review", not as a failure.
 
-**Still to build:** the GraphQL mutations (a dispatched read to gather seeds, and an apply
-mutation that runs accepted candidates through `ISysMLTextImporter`), a provenance metadata
-library (`@Generated { by, prompt, at }`, same shape as items 1–3), and the review/diff UI.
+**Built next — provenance, and applying an accepted candidate.**
+
+`AiProvenance.sysml` ships a `Generated` metadata definition the same way items 1–3 ship theirs;
+`ProposalApplyService` creates the element and stamps it.
+
+**Two silent-failure findings, both measured.**
+
+1. **`by`, `at` and `when` cannot be used as attribute names.** plan.md sketched
+   `@Generated { by, prompt, at }`. Two of those three are reserved, and an attribute using one
+   is dropped by the parser **with zero reports** — *along with every attribute declared after
+   it in the same body*. The first version of this library therefore defined a `Generated`
+   metadata definition with **no attributes at all** while every parse report stayed empty.
+   Probed name by name: `by`, `at`, `when` vanish; `proposalId`, `generatedBy`, `generatedAt`,
+   `who` survive. `AiProvenanceLibraryLoadingTest` now asserts all three attributes are present,
+   so a future rename to something shorter fails loudly instead of quietly emptying provenance.
+2. **Only one of three annotation syntaxes both attaches and carries values**, and all three
+   parse without errors. Written at the same level as the declaration, `@Name { ... }` becomes a
+   **sibling** rather than an annotation. Written as prefix metadata, `#Name` attaches but
+   carries no values. Written unqualified, the type silently fails to resolve. What works is
+   `@AiProvenanceLibrary::Generated { ... }` imported *with the new element as its parent* —
+   the same shape every other metadata edit in this application uses.
+
+**The prompt is not stamped on the element.** Free text would have to be embedded as a SysML
+string literal, and a quotation mark inside one cannot be escaped (item 3). The annotation
+carries `proposalId` instead — a pointer to the row holding the prompt, the model, the author
+and every other candidate from that run, which is both safer and more complete.
+
+**An element never stays in the model unstamped.** Attaching provenance needs a second import,
+so if it fails the element is deleted again and the item is not marked applied. Leaving a
+generated element behind without provenance is the exact failure the library exists to prevent.
+
+**Still to build:** the GraphQL mutations (a dispatched read to gather seeds, and one to apply
+accepted candidates) and the review/diff UI.
 
 **Sequencing.** The seven goals share one pipeline — scope selection → serialize context →
 LLM call → parse and validate returned SysML → diff → apply with provenance — and differ
