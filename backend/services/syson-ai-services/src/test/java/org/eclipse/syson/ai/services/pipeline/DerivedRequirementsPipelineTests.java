@@ -97,6 +97,11 @@ class DerivedRequirementsPipelineTests {
 
         assertThat(outcome.hasSomethingToReview()).isTrue();
         assertThat(outcome.candidateCount()).isEqualTo(2);
+        // The candidates come back with the outcome so the review UI needs no second round trip,
+        // and each carries the exact fragment that will be applied if it is accepted.
+        assertThat(outcome.items()).extracting(ProposedItem::label)
+                .containsExactly("cellCapacityRequirement", "thermalRequirement");
+        assertThat(outcome.items().get(0).sysmlFragment()).contains("3.2 Ah");
     }
 
     @Test

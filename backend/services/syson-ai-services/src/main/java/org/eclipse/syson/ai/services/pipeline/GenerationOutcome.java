@@ -28,17 +28,23 @@ import java.util.UUID;
  *
  * @param proposalId
  *            the persisted proposal, present only when there is something to review
- * @param candidateCount
- *            how many candidates were offered
+ * @param items
+ *            the candidates themselves, so a reviewer can be shown them without a second round
+ *            trip
  * @param problems
  *            why there is nothing to review, when there is nothing to review
  *
  * @author DTPrendergast
  */
-public record GenerationOutcome(UUID proposalId, int candidateCount, List<String> problems) {
+public record GenerationOutcome(UUID proposalId, List<ProposedItem> items, List<String> problems) {
 
     public GenerationOutcome {
+        items = List.copyOf(items);
         problems = List.copyOf(problems);
+    }
+
+    public int candidateCount() {
+        return this.items.size();
     }
 
     public Optional<UUID> proposal() {

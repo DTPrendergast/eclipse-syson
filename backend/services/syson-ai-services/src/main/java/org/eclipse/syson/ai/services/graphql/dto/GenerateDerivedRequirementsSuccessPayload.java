@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.eclipse.sirius.components.core.api.IPayload;
+import org.eclipse.syson.ai.services.pipeline.ProposedItem;
 
 /**
  * The result of asking for derived requirements.
@@ -30,16 +31,21 @@ import org.eclipse.sirius.components.core.api.IPayload;
  *            the mutation id
  * @param proposalId
  *            the proposal to review, null when there is nothing to review
- * @param candidateCount
- *            how many candidates are waiting
+ * @param items
+ *            the candidates themselves, so the review UI can show them without a second call
  * @param problems
  *            why there is nothing to review, when there is nothing
  *
  * @author DTPrendergast
  */
-public record GenerateDerivedRequirementsSuccessPayload(UUID id, String proposalId, int candidateCount, List<String> problems) implements IPayload {
+public record GenerateDerivedRequirementsSuccessPayload(UUID id, String proposalId, List<ProposedItem> items, List<String> problems) implements IPayload {
 
     public GenerateDerivedRequirementsSuccessPayload {
+        items = List.copyOf(items);
         problems = List.copyOf(problems);
+    }
+
+    public int candidateCount() {
+        return this.items.size();
     }
 }

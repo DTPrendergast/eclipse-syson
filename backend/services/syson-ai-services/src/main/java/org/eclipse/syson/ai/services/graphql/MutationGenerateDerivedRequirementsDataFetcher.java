@@ -56,16 +56,19 @@ public class MutationGenerateDerivedRequirementsDataFetcher implements IDataFetc
     private static final String INPUT_ARGUMENT = "input";
 
     /**
-     * Recorded as the author until the application has a server-side identity to read.
+     * Recorded as the author of everything this pipeline produces.
      *
      * <p>
-     * Deliberately not taken from the client. A caller-supplied author would let anyone stamp
-     * anyone's name onto generated content, which is worse than recording nothing because it looks
-     * authoritative. Wiring this to the authenticated principal is required before provenance here
-     * can be treated as an audit record.
+     * This names the <em>origin</em> of the content, not the person who asked for it: what the
+     * model needs to carry, and what a reviewer needs to see, is that an element was machine
+     * generated rather than hand authored. Which human requested it is a separate question, and
+     * one this application cannot answer yet - nothing here reads a server-side identity. It is
+     * deliberately not taken from the client either: a caller-supplied name would let anyone stamp
+     * anyone else onto generated content, which is worse than recording nothing because it looks
+     * authoritative.
      * </p>
      */
-    private static final String UNKNOWN_AUTHOR = "unknown";
+    private static final String AI_ASSISTANT_AUTHOR = "ai-assistant";
 
     private final ObjectMapper objectMapper;
 
@@ -100,7 +103,7 @@ public class MutationGenerateDerivedRequirementsDataFetcher implements IDataFetc
      * Runs the generation away from the editing context's thread.
      */
     private Mono<IPayload> generate(GenerateDerivedRequirementsInput input, IPayload scopePayload) {
-        Mono<IPayload> result = Mono.just(new GenerateDerivedRequirementsSuccessPayload(input.id(), null, 0, List.of("The model context could not be read.")));
+        Mono<IPayload> result = Mono.just(new GenerateDerivedRequirementsSuccessPayload(input.id(), null, List.of(), List.of("The model context could not be read.")));
 
         if (scopePayload instanceof GatherModelScopePayload gathered) {
             SerializedModelScope scope = gathered.scope();
@@ -111,11 +114,11 @@ public class MutationGenerateDerivedRequirementsDataFetcher implements IDataFetc
     }
 
     private IPayload toPayload(GenerateDerivedRequirementsInput input, SerializedModelScope scope) {
-        var outcome = this.pipeline.run(input.editingContextId(), scope, input.instruction(), UNKNOWN_AUTHOR);
+        var outcome = this.pipeline.run(input.editingContextId(), scope, input.instruction(), AI_ASSISTANT_AUTHOR);
         String proposalId = null;
         if (outcome.proposal().isPresent()) {
             proposalId = outcome.proposal().get().toString();
         }
-        return new GenerateDerivedRequirementsSuccessPayload(input.id(), proposalId, outcome.candidateCount(), outcome.problems());
+        return new GenerateDerivedRequirementsSuccessPayload(input.id(), proposalId, outcome.items(), outcome.problems());
     }
 }

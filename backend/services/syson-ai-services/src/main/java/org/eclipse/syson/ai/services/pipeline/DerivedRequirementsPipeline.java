@@ -108,7 +108,7 @@ public class DerivedRequirementsPipeline {
         if (!validation.isValid()) {
             // Nothing is persisted in this case. A failed run should leave no reviewable artefact:
             // storing candidates that failed validation would invite someone to apply them later.
-            outcome = new GenerationOutcome(null, 0, validation.errors());
+            outcome = new GenerationOutcome(null, List.of(), validation.errors());
         } else if (validation.candidates().isEmpty()) {
             outcome = this.nothingToReview("The model did not propose any requirements from this context.");
         } else {
@@ -118,12 +118,15 @@ public class DerivedRequirementsPipeline {
             }
             var proposal = new AiProposal(projectId, TASK_KIND, instruction, generation.modelId(), author, items);
             var saved = this.proposalRepository.save(proposal);
-            outcome = new GenerationOutcome(saved.getId(), items.size(), validation.warnings());
+            var proposed = saved.getItems().stream()
+                    .map(item -> new ProposedItem(item.getId().toString(), item.getLabel(), item.getSysmlFragment()))
+                    .toList();
+            outcome = new GenerationOutcome(saved.getId(), proposed, validation.warnings());
         }
         return outcome;
     }
 
     private GenerationOutcome nothingToReview(String problem) {
-        return new GenerationOutcome(null, 0, List.of(problem));
+        return new GenerationOutcome(null, List.of(), List.of(problem));
     }
 }

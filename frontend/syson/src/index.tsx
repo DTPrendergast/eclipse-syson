@@ -14,6 +14,7 @@
 import { loadDevMessages, loadErrorMessages } from '@apollo/client/dev';
 import {
   DiagramRepresentationConfiguration,
+  editProjectNavbarMenuEntryExtensionPoint,
   footerExtensionPoint,
   navigationBarIconExtensionPoint,
   navigationBarMenuHelpURLExtensionPoint,
@@ -27,6 +28,7 @@ import {
 import { createRoot } from 'react-dom/client';
 
 import { httpOrigin, wsOrigin } from './core/URL';
+import { SysONAiAssistantMenuEntry } from './extensions/ai/SysONAiAssistantMenuEntry';
 import { SysONFooter } from './extensions/SysONFooter';
 import { SysONNavigationBarIcon } from './extensions/SysONNavigationBarIcon';
 import { sysonTheme } from './theme/sysonTheme';
@@ -55,6 +57,11 @@ sysONExtensionRegistry.putData(navigationBarMenuHelpURLExtensionPoint, {
 sysONExtensionRegistry.addComponent(footerExtensionPoint, {
   identifier: `syson_${footerExtensionPoint.identifier}`,
   Component: SysONFooter,
+});
+
+sysONExtensionRegistry.addComponent(editProjectNavbarMenuEntryExtensionPoint, {
+  identifier: `syson_ai_${editProjectNavbarMenuEntryExtensionPoint.identifier}`,
+  Component: SysONAiAssistantMenuEntry,
 });
 
 const container = document.getElementById('root');

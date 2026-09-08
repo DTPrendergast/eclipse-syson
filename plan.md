@@ -703,7 +703,29 @@ this codebase to read (nothing uses `SecurityContextHolder`), so the author is r
 `unknown` until that is wired. **This must be resolved before provenance here is treated as an
 audit record.**
 
-**Still to build:** the review/diff UI, and refusal fallbacks on the Anthropic client.
+**Built next — the review UI.**
+
+`SysONAiAssistantMenuEntry` (project menu) opens `SysONAiReviewDialog`, in
+`frontend/syson/src/extensions/ai/`. The engineer selects elements, says what to derive, and gets
+the candidates back as the exact textual SysML v2 that will be added — accepted or rejected one
+at a time. Rejecting is purely local: it means "never apply this", so nothing about the model
+changes.
+
+- **Placement is constrained, not chosen.** `sirius-web-application` exposes no workbench
+  side-panel extension point (the full list is navbar, footer, project menu, project settings,
+  router, apollo and a few table/query hooks). A docked review panel would mean changing the
+  platform, which CLAUDE.md rules out without a human decision, so the project menu it is.
+- **The generate payload now returns the candidates**, not just a count, so review needs no second
+  round trip.
+- **Author now records origin, not identity** (`ai-assistant`), which is what the user asked for:
+  enough to tell generated content from hand-authored content. Identity remains unwired.
+
+**Known gap:** a proposal can only be reviewed in the dialog session that produced it. The rows
+persist, but there is no query to read one back, so a refresh loses the list — which undercuts
+part of why proposals are persisted at all. A `Query.aiProposal(id)` field and a "resume review"
+entry point close it.
+
+**Still to build:** refusal fallbacks on the Anthropic client, and the read-back query above.
 
 **Sequencing.** The seven goals share one pipeline — scope selection → serialize context →
 LLM call → parse and validate returned SysML → diff → apply with provenance — and differ

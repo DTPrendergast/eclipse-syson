@@ -14,7 +14,14 @@ type GenerateDerivedRequirementsSuccessPayload {
   id: ID!
   proposalId: String
   candidateCount: Int!
+  items: [ProposedItem!]!
   problems: [String!]!
+}
+
+type ProposedItem {
+  id: String!
+  label: String!
+  sysmlFragment: String!
 }
 
 union GenerateDerivedRequirementsPayload = ErrorPayload | GenerateDerivedRequirementsSuccessPayload
