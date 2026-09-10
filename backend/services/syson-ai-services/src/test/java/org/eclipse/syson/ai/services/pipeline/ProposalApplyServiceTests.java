@@ -144,7 +144,7 @@ class ProposalApplyServiceTests {
     }
 
     private AiProposal proposalWith(String fragment) {
-        return new AiProposal("project-1", DerivedRequirementsPipeline.TASK_KIND, "derive things", "claude-opus-5", "dtprendergast",
+        return new AiProposal("project-1", "derived-requirements", "derive things", "claude-opus-5", "dtprendergast",
                 List.of(new AiProposalItem("DER1", fragment)));
     }
 

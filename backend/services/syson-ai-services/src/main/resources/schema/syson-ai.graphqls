@@ -20,18 +20,19 @@ type AiProposalItem {
 }
 
 extend type Mutation {
-  generateDerivedRequirements(input: GenerateDerivedRequirementsInput!): GenerateDerivedRequirementsPayload!
+  generateAiProposal(input: GenerateAiProposalInput!): GenerateAiProposalPayload!
   applyAiProposalItem(input: ApplyAiProposalItemInput!): ApplyAiProposalItemPayload!
 }
 
-input GenerateDerivedRequirementsInput {
+input GenerateAiProposalInput {
   id: ID!
   editingContextId: String!
   elementIds: [String!]!
+  task: String!
   instruction: String!
 }
 
-type GenerateDerivedRequirementsSuccessPayload {
+type GenerateAiProposalSuccessPayload {
   id: ID!
   proposalId: String
   candidateCount: Int!
@@ -45,7 +46,7 @@ type ProposedItem {
   sysmlFragment: String!
 }
 
-union GenerateDerivedRequirementsPayload = ErrorPayload | GenerateDerivedRequirementsSuccessPayload
+union GenerateAiProposalPayload = ErrorPayload | GenerateAiProposalSuccessPayload
 
 input ApplyAiProposalItemInput {
   id: ID!

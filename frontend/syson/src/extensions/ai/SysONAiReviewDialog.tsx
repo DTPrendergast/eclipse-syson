@@ -20,17 +20,19 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import Divider from '@mui/material/Divider';
+import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useEffect, useState } from 'react';
 import {
+  AI_TASKS,
   GQLAiProposal,
   GQLApplyAiProposalItemData,
   GQLApplyAiProposalItemVariables,
-  GQLGenerateDerivedRequirementsData,
-  GQLGenerateDerivedRequirementsSuccessPayload,
-  GQLGenerateDerivedRequirementsVariables,
+  GQLGenerateAiProposalData,
+  GQLGenerateAiProposalSuccessPayload,
+  GQLGenerateAiProposalVariables,
   GQLPendingAiProposalsData,
   GQLPendingAiProposalsVariables,
   GQLProposedItem,
@@ -38,11 +40,11 @@ import {
   SysONAiReviewDialogProps,
 } from './SysONAiReviewDialog.types';
 
-const generateDerivedRequirementsMutation = gql`
-  mutation generateDerivedRequirements($input: GenerateDerivedRequirementsInput!) {
-    generateDerivedRequirements(input: $input) {
+const generateAiProposalMutation = gql`
+  mutation generateAiProposal($input: GenerateAiProposalInput!) {
+    generateAiProposal(input: $input) {
       __typename
-      ... on GenerateDerivedRequirementsSuccessPayload {
+      ... on GenerateAiProposalSuccessPayload {
         proposalId
         candidateCount
         items {
@@ -100,6 +102,7 @@ const applyAiProposalItemMutation = gql`
 export const SysONAiReviewDialog = ({ editingContextId, open, onClose }: SysONAiReviewDialogProps) => {
   const { selection } = useSelection();
   const [instruction, setInstruction] = useState<string>('');
+  const [task, setTask] = useState<string>(AI_TASKS[0]!.kind);
   const [proposalId, setProposalId] = useState<string | null>(null);
   const [items, setItems] = useState<GQLProposedItem[]>([]);
   const [problems, setProblems] = useState<string[]>([]);
@@ -131,10 +134,9 @@ export const SysONAiReviewDialog = ({ editingContextId, open, onClose }: SysONAi
     setInstruction(mostRecent.prompt);
   }, [open, proposalId, pendingProposals]);
 
-  const [generate, { loading: generating }] = useMutation<
-    GQLGenerateDerivedRequirementsData,
-    GQLGenerateDerivedRequirementsVariables
-  >(generateDerivedRequirementsMutation);
+  const [generate, { loading: generating }] = useMutation<GQLGenerateAiProposalData, GQLGenerateAiProposalVariables>(
+    generateAiProposalMutation
+  );
 
   const [applyItem, { loading: applying }] = useMutation<GQLApplyAiProposalItemData, GQLApplyAiProposalItemVariables>(
     applyAiProposalItemMutation
@@ -150,13 +152,14 @@ export const SysONAiReviewDialog = ({ editingContextId, open, onClose }: SysONAi
           id: crypto.randomUUID(),
           editingContextId,
           elementIds: selectedIds,
+          task,
           instruction,
         },
       },
     }).then(({ data }) => {
-      const payload = data?.generateDerivedRequirements;
-      if (payload && payload.__typename === 'GenerateDerivedRequirementsSuccessPayload') {
-        const success = payload as GQLGenerateDerivedRequirementsSuccessPayload;
+      const payload = data?.generateAiProposal;
+      if (payload && payload.__typename === 'GenerateAiProposalSuccessPayload') {
+        const success = payload as GQLGenerateAiProposalSuccessPayload;
         setProposalId(success.proposalId);
         setItems(success.items);
         setProblems(success.problems);
@@ -194,7 +197,7 @@ export const SysONAiReviewDialog = ({ editingContextId, open, onClose }: SysONAi
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" data-testid="ai-review-dialog">
-      <DialogTitle>Propose derived requirements</DialogTitle>
+      <DialogTitle>Ask the modeling assistant</DialogTitle>
       <DialogContent>
         <Stack spacing={2}>
           {proposalId !== null && !generating ? (
@@ -202,11 +205,25 @@ export const SysONAiReviewDialog = ({ editingContextId, open, onClose }: SysONAi
           ) : null}
           <Typography variant="body2" color="textSecondary">
             {selectedIds.length === 0
-              ? 'Select one or more elements in the explorer to derive requirements from.'
-              : `Deriving from ${selectedIds.length} selected element(s).`}
+              ? 'Select one or more elements in the explorer to work from.'
+              : `Working from ${selectedIds.length} selected element(s).`}
           </Typography>
           <TextField
-            label="What should be derived?"
+            select
+            label="Task"
+            value={task}
+            onChange={(event) => setTask(event.target.value)}
+            fullWidth
+            helperText={AI_TASKS.find((entry) => entry.kind === task)?.hint ?? ''}
+            data-testid="ai-task">
+            {AI_TASKS.map((entry) => (
+              <MenuItem key={entry.kind} value={entry.kind}>
+                {entry.label}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            label="What should the assistant do?"
             value={instruction}
             onChange={(event) => setInstruction(event.target.value)}
             multiline

@@ -13,6 +13,7 @@
 package org.eclipse.syson.ai.services.graphql;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -24,9 +25,11 @@ import org.eclipse.sirius.components.graphql.api.IEditingContextDispatcher;
 import org.eclipse.sirius.components.graphql.api.IExceptionWrapper;
 import org.eclipse.syson.ai.services.graphql.dto.GatherModelScopeInput;
 import org.eclipse.syson.ai.services.graphql.dto.GatherModelScopePayload;
-import org.eclipse.syson.ai.services.graphql.dto.GenerateDerivedRequirementsInput;
-import org.eclipse.syson.ai.services.graphql.dto.GenerateDerivedRequirementsSuccessPayload;
-import org.eclipse.syson.ai.services.pipeline.DerivedRequirementsPipeline;
+import org.eclipse.syson.ai.services.graphql.dto.GenerateAiProposalInput;
+import org.eclipse.syson.ai.services.graphql.dto.GenerateAiProposalSuccessPayload;
+import org.eclipse.syson.ai.services.generation.AiTaskRegistry;
+import org.eclipse.syson.ai.services.generation.IAiTask;
+import org.eclipse.syson.ai.services.pipeline.AiProposalPipeline;
 import org.eclipse.syson.ai.services.scope.SerializedModelScope;
 
 import graphql.schema.DataFetchingEnvironment;
@@ -35,7 +38,7 @@ import reactor.core.scheduler.Schedulers;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Data fetcher for the field Mutation#generateDerivedRequirements.
+ * Data fetcher for the field Mutation#generateAiProposal.
  *
  * <p>
  * <b>This is where the two-phase design lives.</b> The client sees one mutation, but it runs as
@@ -50,8 +53,8 @@ import tools.jackson.databind.ObjectMapper;
  *
  * @author DTPrendergast
  */
-@QueryDataFetcher(type = "Mutation", field = "generateDerivedRequirements")
-public class MutationGenerateDerivedRequirementsDataFetcher implements IDataFetcherWithFieldCoordinates<CompletableFuture<IPayload>> {
+@QueryDataFetcher(type = "Mutation", field = "generateAiProposal")
+public class MutationGenerateAiProposalDataFetcher implements IDataFetcherWithFieldCoordinates<CompletableFuture<IPayload>> {
 
     private static final String INPUT_ARGUMENT = "input";
 
@@ -76,20 +79,23 @@ public class MutationGenerateDerivedRequirementsDataFetcher implements IDataFetc
 
     private final IEditingContextDispatcher editingContextDispatcher;
 
-    private final DerivedRequirementsPipeline pipeline;
+    private final AiProposalPipeline pipeline;
 
-    public MutationGenerateDerivedRequirementsDataFetcher(ObjectMapper objectMapper, IExceptionWrapper exceptionWrapper, IEditingContextDispatcher editingContextDispatcher,
-            DerivedRequirementsPipeline pipeline) {
+    private final AiTaskRegistry taskRegistry;
+
+    public MutationGenerateAiProposalDataFetcher(ObjectMapper objectMapper, IExceptionWrapper exceptionWrapper, IEditingContextDispatcher editingContextDispatcher,
+            AiProposalPipeline pipeline, AiTaskRegistry taskRegistry) {
         this.objectMapper = Objects.requireNonNull(objectMapper);
         this.exceptionWrapper = Objects.requireNonNull(exceptionWrapper);
         this.editingContextDispatcher = Objects.requireNonNull(editingContextDispatcher);
         this.pipeline = Objects.requireNonNull(pipeline);
+        this.taskRegistry = Objects.requireNonNull(taskRegistry);
     }
 
     @Override
     public CompletableFuture<IPayload> get(DataFetchingEnvironment environment) throws Exception {
         Object argument = environment.getArgument(INPUT_ARGUMENT);
-        var input = this.objectMapper.convertValue(argument, GenerateDerivedRequirementsInput.class);
+        var input = this.objectMapper.convertValue(argument, GenerateAiProposalInput.class);
 
         var gatherScope = new GatherModelScopeInput(UUID.randomUUID(), input.editingContextId(), input.elementIds());
 
@@ -102,8 +108,8 @@ public class MutationGenerateDerivedRequirementsDataFetcher implements IDataFetc
     /**
      * Runs the generation away from the editing context's thread.
      */
-    private Mono<IPayload> generate(GenerateDerivedRequirementsInput input, IPayload scopePayload) {
-        Mono<IPayload> result = Mono.just(new GenerateDerivedRequirementsSuccessPayload(input.id(), null, List.of(), List.of("The model context could not be read.")));
+    private Mono<IPayload> generate(GenerateAiProposalInput input, IPayload scopePayload) {
+        Mono<IPayload> result = Mono.just(new GenerateAiProposalSuccessPayload(input.id(), null, List.of(), List.of("The model context could not be read.")));
 
         if (scopePayload instanceof GatherModelScopePayload gathered) {
             SerializedModelScope scope = gathered.scope();
@@ -113,12 +119,20 @@ public class MutationGenerateDerivedRequirementsDataFetcher implements IDataFetc
         return result;
     }
 
-    private IPayload toPayload(GenerateDerivedRequirementsInput input, SerializedModelScope scope) {
-        var outcome = this.pipeline.run(input.editingContextId(), scope, input.instruction(), AI_ASSISTANT_AUTHOR);
+    private IPayload toPayload(GenerateAiProposalInput input, SerializedModelScope scope) {
+        Optional<IAiTask> optionalTask = this.taskRegistry.findByKind(input.task());
+        if (optionalTask.isEmpty()) {
+            // Named explicitly rather than defaulted: running a different task from the one asked
+            // for would offer a reviewer candidates of an unexpected kind.
+            return new GenerateAiProposalSuccessPayload(input.id(), null, List.of(),
+                    List.of("Unknown assistant task '" + input.task() + "'. Known tasks: " + String.join(", ", this.taskRegistry.kinds()) + "."));
+        }
+
+        var outcome = this.pipeline.run(input.editingContextId(), scope, input.instruction(), AI_ASSISTANT_AUTHOR, optionalTask.get());
         String proposalId = null;
         if (outcome.proposal().isPresent()) {
             proposalId = outcome.proposal().get().toString();
         }
-        return new GenerateDerivedRequirementsSuccessPayload(input.id(), proposalId, outcome.items(), outcome.problems());
+        return new GenerateAiProposalSuccessPayload(input.id(), proposalId, outcome.items(), outcome.problems());
     }
 }

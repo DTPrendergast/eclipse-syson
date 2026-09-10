@@ -25,7 +25,9 @@ import java.util.List;
 
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.ecore.resource.ResourceSet;
-import org.eclipse.syson.ai.services.generation.DerivedRequirementsPromptFactory;
+import org.eclipse.syson.ai.services.generation.DerivedRequirementsTask;
+import org.eclipse.syson.ai.services.generation.DraftUseCasesTask;
+import org.eclipse.syson.ai.services.generation.TaskPrompts;
 import org.eclipse.syson.ai.services.generation.GenerationRequest;
 import org.eclipse.syson.ai.services.generation.GenerationResult;
 import org.eclipse.syson.ai.services.generation.IGenerationClient;
@@ -56,7 +58,7 @@ import org.junit.jupiter.api.Test;
  *
  * @author DTPrendergast
  */
-class DerivedRequirementsPipelineTests {
+class AiProposalPipelineTests {
 
     private static final String MODEL = """
             package PowerSystem {
@@ -82,8 +84,11 @@ class DerivedRequirementsPipelineTests {
 
     private final IGenerationClient generationClient = mock(IGenerationClient.class);
 
-    private final DerivedRequirementsPipeline pipeline = new DerivedRequirementsPipeline(
-            new DerivedRequirementsPromptFactory(),
+    private final DerivedRequirementsTask derivedRequirements = new DerivedRequirementsTask(new TaskPrompts());
+
+    private final DraftUseCasesTask draftUseCases = new DraftUseCasesTask(new TaskPrompts());
+
+    private final AiProposalPipeline pipeline = new AiProposalPipeline(
             this.generationClient,
             new GeneratedSysmlValidator(new SysmlToAst(null)),
             this.repository);
@@ -129,8 +134,8 @@ class DerivedRequirementsPipelineTests {
         var saved = this.captureSaved();
         assertThat(saved.getPrompt()).isEqualTo("Derive cell-level requirements for the battery.");
         assertThat(saved.getModelId()).isEqualTo("claude-opus-5");
-        assertThat(saved.getCreatedBy()).isEqualTo("dtprendergast");
-        assertThat(saved.getTaskKind()).isEqualTo(DerivedRequirementsPipeline.TASK_KIND);
+        assertThat(saved.getCreatedBy()).isEqualTo("ai-assistant");
+        assertThat(saved.getTaskKind()).isEqualTo(DerivedRequirementsTask.KIND);
         assertThat(saved.getProjectId()).isEqualTo("project-1");
     }
 
@@ -177,7 +182,7 @@ class DerivedRequirementsPipelineTests {
         var outcome = this.run();
 
         assertThat(outcome.hasSomethingToReview()).isFalse();
-        assertThat(outcome.problems()).containsExactly("The model did not propose any requirements from this context.");
+        assertThat(outcome.problems()).containsExactly("The model did not propose anything from this context.");
         verify(this.repository, never()).save(any());
     }
 
@@ -194,13 +199,44 @@ class DerivedRequirementsPipelineTests {
         assertThat(captor.getValue().userPrompt()).contains("Derive cell-level requirements for the battery.");
     }
 
+    @Test
+    void theTaskDecidesWhatKindOfCandidateIsAccepted() {
+        // Use cases from the same pipeline: only the prompt and the expected kind differ, which is
+        // the whole point of the task abstraction.
+        this.stubGeneration("use case restorePower { doc /* Dispatch restores power to a feeder. */ }");
+        when(this.repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Element seed = this.find("enduranceRequirement");
+        var policy = ModelScopePolicy.defaultPolicy();
+        var scope = new ModelScopeSerializer().serialize(new ModelScopeSelector().select(List.of(seed), policy), policy);
+
+        var outcome = this.pipeline.run("project-1", scope, "Draft use cases.", "ai-assistant", this.draftUseCases);
+
+        assertThat(outcome.hasSomethingToReview()).isTrue();
+        assertThat(outcome.items()).extracting(ProposedItem::label).containsExactly("restorePower");
+        assertThat(this.captureSaved().getTaskKind()).isEqualTo(DraftUseCasesTask.KIND);
+    }
+
+    @Test
+    void aUseCaseIsRejectedWhenTheRequirementsTaskWasAskedFor() {
+        this.stubGeneration("use case restorePower;");
+
+        var outcome = this.run();
+
+        // Same response, different task: the type check is what makes the tasks distinct rather
+        // than the prompt wording, which a model is free to ignore.
+        assertThat(outcome.hasSomethingToReview()).isFalse();
+        assertThat(outcome.problems().get(0)).contains("Expected only RequirementUsage");
+        verify(this.repository, never()).save(any());
+    }
+
     private GenerationOutcome run() {
         // The scope is gathered the way the query handler gathers it, then handed over as text -
         // the pipeline never sees an EMF object.
         Element seed = this.find("enduranceRequirement");
         var policy = ModelScopePolicy.defaultPolicy();
         var scope = new ModelScopeSerializer().serialize(new ModelScopeSelector().select(List.of(seed), policy), policy);
-        return this.pipeline.run("project-1", scope, "Derive cell-level requirements for the battery.", "dtprendergast");
+        return this.pipeline.run("project-1", scope, "Derive cell-level requirements for the battery.", "ai-assistant", this.derivedRequirements);
     }
 
     private void stubGeneration(String responseText) {

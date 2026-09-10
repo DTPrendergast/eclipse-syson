@@ -20,19 +20,19 @@ import org.eclipse.syson.ai.services.scope.SerializedModelScope;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests of the goal 3 prompt.
+ * Tests of the task prompts and the rules they all share.
  *
  * @author DTPrendergast
  */
-class DerivedRequirementsPromptTests {
+class AiTaskPromptTests {
 
-    private final DerivedRequirementsPromptFactory factory = new DerivedRequirementsPromptFactory();
+    private final DerivedRequirementsTask factory = new DerivedRequirementsTask(new TaskPrompts());
 
     @Test
     void carriesTheInstructionAndTheSerializedModel() {
         var scope = new SerializedModelScope("requirement <REQ1> enduranceRequirement;", 1, false, List.of());
 
-        var request = this.factory.create(scope, "Derive power subsystem requirements from REQ1.");
+        var request = this.factory.prompt(scope, "Derive power subsystem requirements from REQ1.");
 
         assertThat(request.userPrompt()).contains("Derive power subsystem requirements from REQ1.");
         assertThat(request.userPrompt()).contains("requirement <REQ1> enduranceRequirement;");
@@ -40,7 +40,7 @@ class DerivedRequirementsPromptTests {
 
     @Test
     void asksForTextualSysmlBecauseTheParserIsWhatValidatesTheAnswer() {
-        var request = this.factory.create(new SerializedModelScope("", 0, false, List.of()), "anything");
+        var request = this.factory.prompt(new SerializedModelScope("", 0, false, List.of()), "anything");
 
         assertThat(request.systemPrompt()).contains("Emit only textual SysML v2");
         assertThat(request.systemPrompt()).doesNotContain("JSON schema");
@@ -48,7 +48,7 @@ class DerivedRequirementsPromptTests {
 
     @Test
     void forbidsTheConstructsKnownToBeSilentlyLossy() {
-        var request = this.factory.create(new SerializedModelScope("", 0, false, List.of()), "anything");
+        var request = this.factory.prompt(new SerializedModelScope("", 0, false, List.of()), "anything");
 
         // plan.md item 4: calc parses fine, then serializes back as action. A model that emits it
         // produces something that passes validation and changes meaning on the next export.
@@ -57,8 +57,8 @@ class DerivedRequirementsPromptTests {
 
     @Test
     void tellsTheModelWhenItIsOnlySeeingPartOfTheModel() {
-        var full = this.factory.create(new SerializedModelScope("part x;", 1, false, List.of()), "go");
-        var truncated = this.factory.create(new SerializedModelScope("part x;", 1, true, List.of()), "go");
+        var full = this.factory.prompt(new SerializedModelScope("part x;", 1, false, List.of()), "go");
+        var truncated = this.factory.prompt(new SerializedModelScope("part x;", 1, true, List.of()), "go");
 
         assertThat(full.userPrompt()).doesNotContain("partial view");
         assertThat(truncated.userPrompt()).contains("partial view");
@@ -67,7 +67,7 @@ class DerivedRequirementsPromptTests {
 
     @Test
     void saysSoWhenNothingWasInScope() {
-        var request = this.factory.create(new SerializedModelScope("", 0, false, List.of()), "go");
+        var request = this.factory.prompt(new SerializedModelScope("", 0, false, List.of()), "go");
 
         assertThat(request.userPrompt()).contains("No model elements were in scope");
     }

@@ -39,11 +39,11 @@ export const SysONAiAssistantMenuEntry = ({ onCloseContextMenu }: EditProjectNav
       <MenuItem
         onClick={() => setOpen(true)}
         data-testid="ai-assistant-menu-entry"
-        aria-label="propose derived requirements">
+        aria-label="ask the modeling assistant">
         <ListItemIcon>
           <AutoAwesomeIcon fontSize="small" />
         </ListItemIcon>
-        <ListItemText primary="Propose derived requirements" />
+        <ListItemText primary="Ask the modeling assistant" />
       </MenuItem>
       <SysONAiReviewDialog
         editingContextId={editingContextId}

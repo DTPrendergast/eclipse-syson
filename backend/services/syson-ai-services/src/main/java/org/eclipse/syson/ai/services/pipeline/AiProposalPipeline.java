@@ -16,7 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-import org.eclipse.syson.ai.services.generation.DerivedRequirementsPromptFactory;
+import org.eclipse.syson.ai.services.generation.IAiTask;
 import org.eclipse.syson.ai.services.generation.GenerationResult;
 import org.eclipse.syson.ai.services.generation.IGenerationClient;
 import org.eclipse.syson.ai.services.proposal.AiProposal;
@@ -25,11 +25,10 @@ import org.eclipse.syson.ai.services.proposal.IAiProposalRepository;
 import org.eclipse.syson.ai.services.scope.SerializedModelScope;
 import org.eclipse.syson.ai.services.validation.GeneratedSysmlValidator;
 import org.eclipse.syson.ai.services.validation.ValidationResult;
-import org.eclipse.syson.sysml.RequirementUsage;
 import org.springframework.stereotype.Service;
 
 /**
- * Runs the derived-requirements pipeline: scope, serialize, generate, validate, persist.
+ * Runs one assistant task: prompt, generate, validate, persist.
  *
  * <p>
  * <b>Nothing here touches the model - it cannot.</b> This takes an already-serialized scope rather
@@ -50,12 +49,7 @@ import org.springframework.stereotype.Service;
  * @author DTPrendergast
  */
 @Service
-public class DerivedRequirementsPipeline {
-
-    /** Recorded on the proposal so a later run of a different goal is distinguishable. */
-    public static final String TASK_KIND = "derived-requirements";
-
-    private final DerivedRequirementsPromptFactory promptFactory;
+public class AiProposalPipeline {
 
     private final IGenerationClient generationClient;
 
@@ -63,9 +57,7 @@ public class DerivedRequirementsPipeline {
 
     private final IAiProposalRepository proposalRepository;
 
-    public DerivedRequirementsPipeline(DerivedRequirementsPromptFactory promptFactory, IGenerationClient generationClient, GeneratedSysmlValidator validator,
-            IAiProposalRepository proposalRepository) {
-        this.promptFactory = Objects.requireNonNull(promptFactory);
+    public AiProposalPipeline(IGenerationClient generationClient, GeneratedSysmlValidator validator, IAiProposalRepository proposalRepository) {
         this.generationClient = Objects.requireNonNull(generationClient);
         this.validator = Objects.requireNonNull(validator);
         this.proposalRepository = Objects.requireNonNull(proposalRepository);
@@ -82,16 +74,18 @@ public class DerivedRequirementsPipeline {
      * @param instruction
      *            what the engineer asked for
      * @param author
-     *            who asked, recorded as provenance
+     *            the origin of the content, recorded as provenance
+     * @param task
+     *            which task to run; supplies the prompt and the kind every candidate must be
      * @return what happened, including why there is nothing to review when there is nothing
      */
-    public GenerationOutcome run(String projectId, SerializedModelScope scope, String instruction, String author) {
-        var request = this.promptFactory.create(scope, instruction);
+    public GenerationOutcome run(String projectId, SerializedModelScope scope, String instruction, String author, IAiTask task) {
+        var request = task.prompt(scope, instruction);
 
         GenerationResult generation = this.generationClient.generate(request);
         GenerationOutcome outcome;
         if (generation.isUsable()) {
-            outcome = this.review(projectId, instruction, author, generation);
+            outcome = this.review(projectId, instruction, author, generation, task);
         } else {
             outcome = this.nothingToReview(generation.explanationIfAny().orElse("Generation did not produce an answer: " + generation.outcome() + "."));
         }
@@ -101,8 +95,8 @@ public class DerivedRequirementsPipeline {
     /**
      * Validates what came back and, if it holds up, stores it for review.
      */
-    private GenerationOutcome review(String projectId, String instruction, String author, GenerationResult generation) {
-        ValidationResult validation = this.validator.validate(generation.text(), RequirementUsage.class);
+    private GenerationOutcome review(String projectId, String instruction, String author, GenerationResult generation, IAiTask task) {
+        ValidationResult validation = this.validator.validate(generation.text(), task.expectedKind());
 
         GenerationOutcome outcome;
         if (!validation.isValid()) {
@@ -110,13 +104,13 @@ public class DerivedRequirementsPipeline {
             // storing candidates that failed validation would invite someone to apply them later.
             outcome = new GenerationOutcome(null, List.of(), validation.errors());
         } else if (validation.candidates().isEmpty()) {
-            outcome = this.nothingToReview("The model did not propose any requirements from this context.");
+            outcome = this.nothingToReview("The model did not propose anything from this context.");
         } else {
             var items = new ArrayList<AiProposalItem>();
             for (var candidate : validation.candidates()) {
                 items.add(new AiProposalItem(candidate.label(), candidate.sysmlFragment()));
             }
-            var proposal = new AiProposal(projectId, TASK_KIND, instruction, generation.modelId(), author, items);
+            var proposal = new AiProposal(projectId, task.kind(), instruction, generation.modelId(), author, items);
             var saved = this.proposalRepository.save(proposal);
             var proposed = saved.getItems().stream()
                     .map(item -> new ProposedItem(item.getId().toString(), item.getLabel(), item.getSysmlFragment()))

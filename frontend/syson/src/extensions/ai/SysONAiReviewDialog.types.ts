@@ -22,36 +22,37 @@ export interface GQLProposedItem {
   sysmlFragment: string;
 }
 
-export interface GQLGenerateDerivedRequirementsPayload {
+export interface GQLGenerateAiProposalPayload {
   __typename: string;
 }
 
-export interface GQLGenerateDerivedRequirementsSuccessPayload extends GQLGenerateDerivedRequirementsPayload {
+export interface GQLGenerateAiProposalSuccessPayload extends GQLGenerateAiProposalPayload {
   proposalId: string | null;
   candidateCount: number;
   items: GQLProposedItem[];
   problems: string[];
 }
 
-export interface GQLErrorPayload extends GQLGenerateDerivedRequirementsPayload {
+export interface GQLErrorPayload extends GQLGenerateAiProposalPayload {
   message: string;
 }
 
-export interface GQLGenerateDerivedRequirementsData {
-  generateDerivedRequirements: GQLGenerateDerivedRequirementsPayload;
+export interface GQLGenerateAiProposalData {
+  generateAiProposal: GQLGenerateAiProposalPayload;
 }
 
-export interface GQLGenerateDerivedRequirementsVariables {
+export interface GQLGenerateAiProposalVariables {
   input: {
     id: string;
     editingContextId: string;
     elementIds: string[];
+    task: string;
     instruction: string;
   };
 }
 
 export interface GQLApplyAiProposalItemData {
-  applyAiProposalItem: GQLGenerateDerivedRequirementsPayload;
+  applyAiProposalItem: GQLGenerateAiProposalPayload;
 }
 
 export interface GQLApplyAiProposalItemVariables {
@@ -92,6 +93,29 @@ export interface GQLPendingAiProposalsData {
 export interface GQLPendingAiProposalsVariables {
   editingContextId: string;
 }
+
+/**
+ * The assistant tasks offered in the dialog. The `kind` values must match the task kinds the
+ * backend registers; an unknown one is reported rather than silently defaulted.
+ */
+export interface AiTaskOption {
+  kind: string;
+  label: string;
+  hint: string;
+}
+
+export const AI_TASKS: AiTaskOption[] = [
+  {
+    kind: 'derived-requirements',
+    label: 'Derive requirements',
+    hint: 'Proposes requirements derived from the selected requirements and structure.',
+  },
+  {
+    kind: 'draft-use-cases',
+    label: 'Draft use cases',
+    hint: 'Drafts use cases from an operational concept narrative.',
+  },
+];
 
 /**
  * Where a candidate has got to in this dialog. "rejected" is local: rejecting a candidate simply

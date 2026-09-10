@@ -746,6 +746,26 @@ Because that body property is untypechecked, the tests assert the request actual
 beta flag and the correctly shaped property — which can be done without an API key. If a later
 SDK version adds a typed API, this is the thing to replace.
 
+**Generalized into task adapters (2026-09-09).** What was a derived-requirements pipeline is now
+`AiProposalPipeline` plus `IAiTask` implementations, which is what plan.md said from the start:
+the seven goals share one pipeline and differ only in prompt, scoping and output shape. A task
+supplies three things — its kind, the metamodel type every candidate must be, and its prompt —
+and nothing else. Spring collects them, so adding a task is one class and no wiring.
+
+Two tasks so far: `derived-requirements` (goal 3) and `draft-use-cases`, which drafts use cases
+from an operational-concept narrative. The narrative reaches the model because the scope
+serializer emits `doc` bodies inline. `use case` usages only, not `use case def` — both parse
+cleanly, but an operational concept describes what people do rather than defining reusable types,
+and allowing either would mean one run offering a reviewer two different kinds of candidate.
+
+**The type check is what makes tasks distinct, not the prompt.** A test asserts that a use case
+returned for the requirements task is rejected: prompt wording is advisory and a model may ignore
+it, whereas `expectedKind()` cannot be ignored.
+
+The mutation is now `generateAiProposal` with an explicit `task` field. An unknown task name is
+reported rather than defaulted — silently running a different task would put candidates of an
+unexpected kind in front of a reviewer.
+
 **Item 4 backend and UI are complete.** What has never happened is a single real API call: there
 is no key configured in this environment, so every test to date stubs the model call. Prompt
 quality, the validator's strictness against real model output, and the fallback wire shape are

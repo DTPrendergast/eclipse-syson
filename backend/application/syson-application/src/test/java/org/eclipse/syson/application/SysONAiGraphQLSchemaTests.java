@@ -43,7 +43,7 @@ public class SysONAiGraphQLSchemaTests extends AbstractIntegrationTests {
     public void theAssistantsMutationsAreInTheSchema() {
         var mutationType = this.graphQLSchema.getMutationType();
 
-        assertThat(mutationType.getFieldDefinition("generateDerivedRequirements"))
+        assertThat(mutationType.getFieldDefinition("generateAiProposal"))
                 .as("the syson-ai schema extension was not picked up")
                 .isNotNull();
         assertThat(mutationType.getFieldDefinition("applyAiProposalItem")).isNotNull();
@@ -62,7 +62,7 @@ public class SysONAiGraphQLSchemaTests extends AbstractIntegrationTests {
 
     @Test
     public void theGeneratePayloadIsAUnionThatCanCarryAnError() {
-        var payloadType = this.graphQLSchema.getType("GenerateDerivedRequirementsPayload");
+        var payloadType = this.graphQLSchema.getType("GenerateAiProposalPayload");
 
         // The exception wrapper turns a failed generation into an ErrorPayload, so the field's
         // type has to admit one. A plain object type would fail at runtime, on the error path

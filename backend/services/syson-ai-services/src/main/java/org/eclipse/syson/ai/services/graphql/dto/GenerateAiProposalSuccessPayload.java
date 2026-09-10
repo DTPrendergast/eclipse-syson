@@ -38,9 +38,9 @@ import org.eclipse.syson.ai.services.pipeline.ProposedItem;
  *
  * @author DTPrendergast
  */
-public record GenerateDerivedRequirementsSuccessPayload(UUID id, String proposalId, List<ProposedItem> items, List<String> problems) implements IPayload {
+public record GenerateAiProposalSuccessPayload(UUID id, String proposalId, List<ProposedItem> items, List<String> problems) implements IPayload {
 
-    public GenerateDerivedRequirementsSuccessPayload {
+    public GenerateAiProposalSuccessPayload {
         items = List.copyOf(items);
         problems = List.copyOf(problems);
     }
