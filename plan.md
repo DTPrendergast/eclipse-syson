@@ -207,6 +207,23 @@ be valid SysML and would export as two `doc` blocks.
 
 **Sizing is fine** — the editor fills the main panel (confirmed in use).
 
+**The narrative is documentation of the `OperationalConcept` annotation, not of the package**
+(changed 2026-09-14). They are different things — a package's own `doc` says what the package is,
+the narrative says who uses the system and how — and sharing one body forced one to stand in for
+the other. Both now export as ordinary `doc` blocks any SysML v2 tool reads, so the separation
+costs no interop.
+
+A string attribute on the annotation was tried and rejected on evidence: a quotation mark inside a
+SysML string literal cannot be escaped — `narrative = "he said \"hi\""` stores as `he said \` —
+and a narrative will certainly contain quotes. Storing it outside the model was rejected too: it
+would not export, other tools would not see it, and the AI would go blind to it.
+
+**That last point was the load-bearing check.** *Draft use cases* reads the narrative only because
+the scope serializer emits `doc` bodies inline; moving the text could have broken that silently,
+leaving the task running happily against a package with no narrative in it. Verified before
+building: with the narrative on the annotation, the serialized scope still contains it, and the
+package's own documentation as well.
+
 **Editing is plain text; rendering is separate, read-only, and toggled.** The narrative is
 authored in a `TextArea` as raw Markdown and the rendered form is a `RichText` widget with
 `isEnabledExpression` false — disabled, so it renders with no toolbar and no editable surface,
@@ -246,6 +263,14 @@ component's theme simply maps `h1` and `h2` only
 
 Shelved 2026-09-14 as good enough: `#` and `##` are styled, which covers the section levels a
 ConOps outline actually needs.
+
+**TODO:** fix Markdown degradation across an export/reimport cycle. Measured: a body of
+`# Introduction\n\nThe operator…` exports as a `doc` block with each line after the first
+indented by a tab, and reimports as `# Introduction\n\t\nThe operator…`. A tab-indented line is a
+code block in Markdown, so headings and lists stop working, and it is **cumulative** — every round
+trip adds another tab. This breaks the cross-cutting "export/reimport is lossless" invariant for
+any prose body. Options: normalize leading indentation when reading a body back (cheap, but would
+also eat deliberate indentation such as code blocks), or report the serializer behaviour upstream.
 
 **TODO:** decide whether Markdown tables are needed in narratives. `@lexical/markdown`'s default
 `TRANSFORMERS` — which the component uses unmodified — has no `TABLE` transformer, so a table stays

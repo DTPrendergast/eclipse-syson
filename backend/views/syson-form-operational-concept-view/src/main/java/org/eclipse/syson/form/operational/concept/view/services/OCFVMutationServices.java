@@ -14,19 +14,27 @@ package org.eclipse.syson.form.operational.concept.view.services;
 
 import org.eclipse.syson.sysml.Documentation;
 import org.eclipse.syson.sysml.Element;
+import org.eclipse.syson.sysml.MetadataUsage;
 import org.eclipse.syson.sysml.OwningMembership;
 import org.eclipse.syson.sysml.SysmlFactory;
 
 /**
- * Writes the documentation body of an element back, for the operational concept form.
+ * Writes the operational concept narrative back.
+ *
+ * <p>
+ * The narrative is stored as documentation of the {@code OperationalConcept} annotation, leaving
+ * the element's own {@code doc} free to say what the package is. See {@code OCFVQueryServices} for
+ * why that separation exists and why a string attribute was rejected.
+ * </p>
  *
  * @author DTPrendergast
  */
 public class OCFVMutationServices {
 
+    private final OCFVQueryServices queryServices = new OCFVQueryServices();
+
     /**
-     * Sets the element's documentation body, creating the {@code Documentation} if the element does
-     * not have one yet.
+     * Sets the narrative, creating the {@code Documentation} on the annotation if there is none yet.
      *
      * <p>
      * This edits the existing {@code Documentation} in place rather than importing textual SysML.
@@ -40,20 +48,28 @@ public class OCFVMutationServices {
      * @param element
      *            the element being edited
      * @param newValue
-     *            the new body; null is treated as an empty body
+     *            the new narrative; null is treated as empty
      * @return the element, so the AQL expression has something to continue from
      */
-    public Element setDocumentationBody(Element element, String newValue) {
+    public Element setNarrative(Element element, String newValue) {
         String body = "";
         if (newValue != null) {
             body = newValue;
         }
 
-        Documentation documentation = this.firstDocumentation(element);
+        MetadataUsage annotation = this.queryServices.operationalConceptAnnotation(element);
+        if (annotation == null) {
+            // The form is only offered on elements that carry the annotation, so this means the
+            // marker was removed while the editor was open. Writing the narrative onto the element
+            // instead would put it somewhere nothing reads it back from, so nothing is written.
+            return element;
+        }
+
+        Documentation documentation = this.firstDocumentation(annotation);
         if (documentation == null) {
             documentation = SysmlFactory.eINSTANCE.createDocumentation();
             OwningMembership owningMembership = SysmlFactory.eINSTANCE.createOwningMembership();
-            element.getOwnedRelationship().add(owningMembership);
+            annotation.getOwnedRelationship().add(owningMembership);
             owningMembership.getOwnedRelatedElement().add(documentation);
         }
         documentation.setBody(body);

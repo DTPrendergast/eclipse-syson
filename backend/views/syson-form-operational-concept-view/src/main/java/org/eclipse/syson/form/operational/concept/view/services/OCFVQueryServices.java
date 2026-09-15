@@ -14,27 +14,55 @@ package org.eclipse.syson.form.operational.concept.view.services;
 
 import org.eclipse.syson.sysml.Documentation;
 import org.eclipse.syson.sysml.Element;
+import org.eclipse.syson.sysml.MetadataUsage;
 import org.eclipse.syson.sysml.OwningMembership;
 
 /**
- * Reads the documentation body of an element, for the operational concept form.
+ * Reads the operational concept narrative.
+ *
+ * <p>
+ * <b>The narrative is documentation of the {@code OperationalConcept} annotation, not of the
+ * package.</b> They are different things: a package's {@code doc} says what the package is, while
+ * the narrative says who uses the system and how. Keeping them in one body forced one to stand in
+ * for the other. Putting the narrative on the annotation gives each its own, and both still export
+ * as ordinary {@code doc} blocks that any SysML v2 tool can read.
+ * </p>
+ *
+ * <p>
+ * The alternative of a string attribute on the annotation was tried and rejected: a quotation mark
+ * inside a SysML string literal cannot be escaped - {@code narrative = "he said \"hi\""} stores as
+ * {@code he said \} - and a narrative will certainly contain quotes.
+ * </p>
  *
  * @author DTPrendergast
  */
 public class OCFVQueryServices {
 
     /**
-     * The element's documentation body, as authored.
-     *
-     * <p>
-     * An element may own several {@code Documentation} elements; this reads the first, which is the
-     * one the textual syntax produces for a single {@code doc} block and the one the editor writes
-     * back to.
-     * </p>
+     * The narrative, read from the operational concept annotation.
      *
      * @param element
      *            the element being edited
-     * @return the body, or an empty string when the element has no documentation yet
+     * @return the narrative, or an empty string when none has been written yet
+     */
+    public String getNarrative(Element element) {
+        String body = "";
+        MetadataUsage annotation = this.operationalConceptAnnotation(element);
+        if (annotation != null) {
+            Documentation documentation = this.firstDocumentation(annotation);
+            if (documentation != null && documentation.getBody() != null) {
+                body = documentation.getBody();
+            }
+        }
+        return body;
+    }
+
+    /**
+     * The element's own documentation - what the package is, as distinct from the narrative.
+     *
+     * @param element
+     *            the element being edited
+     * @return the body, or an empty string when the element has no documentation
      */
     public String getDocumentationBody(Element element) {
         String body = "";
@@ -43,6 +71,26 @@ public class OCFVQueryServices {
             body = documentation.getBody();
         }
         return body;
+    }
+
+    /**
+     * The {@code OperationalConcept} annotation on the element, if it carries one.
+     *
+     * @param element
+     *            the candidate element
+     * @return the annotation, or null
+     */
+    public MetadataUsage operationalConceptAnnotation(Element element) {
+        return element.getOwnedRelationship().stream()
+                .filter(OwningMembership.class::isInstance)
+                .map(OwningMembership.class::cast)
+                .flatMap(owningMembership -> owningMembership.getOwnedRelatedElement().stream())
+                .filter(MetadataUsage.class::isInstance)
+                .map(MetadataUsage.class::cast)
+                .filter(metadataUsage -> metadataUsage.getMetadataDefinition() != null
+                        && "OperationalConcept".equals(metadataUsage.getMetadataDefinition().getName()))
+                .findFirst()
+                .orElse(null);
     }
 
     /**
@@ -60,14 +108,7 @@ public class OCFVQueryServices {
      * @return true when the element carries the OperationalConcept metadata
      */
     public boolean isOperationalConcept(Element element) {
-        return element.getOwnedRelationship().stream()
-                .filter(OwningMembership.class::isInstance)
-                .map(OwningMembership.class::cast)
-                .flatMap(owningMembership -> owningMembership.getOwnedRelatedElement().stream())
-                .filter(org.eclipse.syson.sysml.MetadataUsage.class::isInstance)
-                .map(org.eclipse.syson.sysml.MetadataUsage.class::cast)
-                .anyMatch(metadataUsage -> metadataUsage.getMetadataDefinition() != null
-                        && "OperationalConcept".equals(metadataUsage.getMetadataDefinition().getName()));
+        return this.operationalConceptAnnotation(element) != null;
     }
 
     private Documentation firstDocumentation(Element element) {

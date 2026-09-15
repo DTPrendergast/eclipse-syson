@@ -39,10 +39,12 @@ import org.junit.jupiter.api.Test;
  */
 class OCFVServicesTests {
 
-    private static final String WITH_DOC = """
+    private static final String WITH_NARRATIVE = """
             package DispatchOperations {
-                @OperationalConceptLibrary::OperationalConcept;
-                doc /* Dispatchers coordinate field crews during an outage. */
+                doc /* Everything to do with outage dispatch. */
+                @OperationalConceptLibrary::OperationalConcept {
+                    doc /* Dispatchers coordinate field crews during an outage. */
+                }
                 part dispatcher;
             }
             """;
@@ -59,68 +61,86 @@ class OCFVServicesTests {
 
     @Test
     void readsTheNarrativeBack() {
-        Element concept = this.findPackage(WITH_DOC, "DispatchOperations");
+        Element concept = this.findPackage(WITH_NARRATIVE, "DispatchOperations");
 
-        assertThat(this.queryServices.getDocumentationBody(concept))
+        assertThat(this.queryServices.getNarrative(concept))
                 .contains("Dispatchers coordinate field crews during an outage.");
     }
 
     @Test
-    void anElementWithoutDocumentationReadsAsEmptyRatherThanNull() {
+    void theNarrativeAndThePackageDocumentationAreSeparateFields() {
+        Element concept = this.findPackage(WITH_NARRATIVE, "DispatchOperations");
+
+        // The whole point of storing the narrative on the annotation: a package's own doc says what
+        // the package is, the narrative says who uses the system and how, and editing one must not
+        // touch the other.
+        assertThat(this.queryServices.getDocumentationBody(concept)).isEqualTo("Everything to do with outage dispatch.");
+
+        this.mutationServices.setNarrative(concept, "rewritten narrative");
+
+        assertThat(this.queryServices.getNarrative(concept)).isEqualTo("rewritten narrative");
+        assertThat(this.queryServices.getDocumentationBody(concept)).isEqualTo("Everything to do with outage dispatch.");
+    }
+
+    @Test
+    void anElementWithoutANarrativeReadsAsEmptyRatherThanNull() {
         Element plain = this.findPackage(WITHOUT_DOC, "PlainPackage");
 
         // The widget binds this straight to its value, so null here would surface as a broken
         // editor rather than an empty one.
-        assertThat(this.queryServices.getDocumentationBody(plain)).isEmpty();
+        assertThat(this.queryServices.getNarrative(plain)).isEmpty();
     }
 
     @Test
     void writesTheNarrativeBack() {
-        Element concept = this.findPackage(WITH_DOC, "DispatchOperations");
+        Element concept = this.findPackage(WITH_NARRATIVE, "DispatchOperations");
 
-        this.mutationServices.setDocumentationBody(concept, "# Revised\n\nDispatchers triage, then dispatch.");
+        this.mutationServices.setNarrative(concept, "# Revised\n\nDispatchers triage, then dispatch.");
 
-        assertThat(this.queryServices.getDocumentationBody(concept)).isEqualTo("# Revised\n\nDispatchers triage, then dispatch.");
+        assertThat(this.queryServices.getNarrative(concept)).isEqualTo("# Revised\n\nDispatchers triage, then dispatch.");
     }
 
     @Test
     void editingReplacesTheBodyRatherThanAddingASecondDocumentation() {
-        Element concept = this.findPackage(WITH_DOC, "DispatchOperations");
+        Element concept = this.findPackage(WITH_NARRATIVE, "DispatchOperations");
 
-        this.mutationServices.setDocumentationBody(concept, "first edit");
-        this.mutationServices.setDocumentationBody(concept, "second edit");
+        this.mutationServices.setNarrative(concept, "first edit");
+        this.mutationServices.setNarrative(concept, "second edit");
 
-        // Two doc bodies on one element would both be valid SysML and would export as two doc
+        // Two doc bodies on the annotation would both be valid SysML and would export as two doc
         // blocks, so this is the assertion that keeps editing idempotent.
-        long documentationCount = concept.getOwnedElement().stream()
+        long documentationCount = this.queryServices.operationalConceptAnnotation(concept).getOwnedElement().stream()
                 .filter(org.eclipse.syson.sysml.Documentation.class::isInstance)
                 .count();
         assertThat(documentationCount).isEqualTo(1);
-        assertThat(this.queryServices.getDocumentationBody(concept)).isEqualTo("second edit");
+        assertThat(this.queryServices.getNarrative(concept)).isEqualTo("second edit");
     }
 
     @Test
-    void createsTheDocumentationWhenTheElementHasNoneYet() {
+    void writesNothingWhenTheElementIsNotAnOperationalConcept() {
         Element plain = this.findPackage(WITHOUT_DOC, "PlainPackage");
 
-        this.mutationServices.setDocumentationBody(plain, "newly authored narrative");
+        this.mutationServices.setNarrative(plain, "narrative with nowhere to live");
 
-        assertThat(this.queryServices.getDocumentationBody(plain)).isEqualTo("newly authored narrative");
+        // Writing it onto the element itself would put it where nothing reads it back from, and
+        // would silently overwrite the element's own documentation.
+        assertThat(this.queryServices.getNarrative(plain)).isEmpty();
+        assertThat(this.queryServices.getDocumentationBody(plain)).isEmpty();
     }
 
     @Test
     void recognisesAnOperationalConceptByItsMetadata() {
-        assertThat(this.queryServices.isOperationalConcept(this.findPackage(WITH_DOC, "DispatchOperations"))).isTrue();
+        assertThat(this.queryServices.isOperationalConcept(this.findPackage(WITH_NARRATIVE, "DispatchOperations"))).isTrue();
         assertThat(this.queryServices.isOperationalConcept(this.findPackage(WITHOUT_DOC, "PlainPackage"))).isFalse();
     }
 
     @Test
     void aNullEditIsTreatedAsClearingTheNarrative() {
-        Element concept = this.findPackage(WITH_DOC, "DispatchOperations");
+        Element concept = this.findPackage(WITH_NARRATIVE, "DispatchOperations");
 
-        this.mutationServices.setDocumentationBody(concept, null);
+        this.mutationServices.setNarrative(concept, null);
 
-        assertThat(this.queryServices.getDocumentationBody(concept)).isEmpty();
+        assertThat(this.queryServices.getNarrative(concept)).isEmpty();
     }
 
     private Element findPackage(String source, String declaredName) {

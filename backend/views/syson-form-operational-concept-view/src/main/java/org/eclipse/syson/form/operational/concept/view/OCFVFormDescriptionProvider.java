@@ -27,6 +27,14 @@ import org.eclipse.syson.util.SysMLMetamodelHelper;
  * The operational concept narrative, as an editable Markdown document in the main editor panel.
  *
  * <p>
+ * <b>The narrative is documentation of the {@code OperationalConcept} annotation, not of the
+ * package.</b> A package's own {@code doc} says what the package is; the narrative says who uses
+ * the system and how. They are separate fields that can differ, and both export as ordinary
+ * {@code doc} blocks. The AI pipeline still sees the narrative - checked - because the scope
+ * serializer emits the annotation and its documentation inline with the package.
+ * </p>
+ *
+ * <p>
  * An operational concept is mostly prose - who uses the system and how they intend to use it - and
  * a one-line text field in the Details panel is a poor place to write or read several paragraphs of
  * it. A form is a representation, so this opens in the main panel beside diagrams and tables, and
@@ -73,18 +81,18 @@ public class OCFVFormDescriptionProvider implements IRepresentationDescriptionPr
 
         var source = this.formBuilders.newTextAreaDescription()
                 .name("OCFV-TextArea-Narrative")
-                .labelExpression("Source")
+                .labelExpression("Narrative (Markdown source)")
                 .helpExpression("Who uses this system, and how do they intend to use it? Written as Markdown; the rendered form is below.")
-                .valueExpression("aql:self.getDocumentationBody()")
+                .valueExpression("aql:self.getNarrative()")
                 .body(this.viewBuilders.newChangeContext()
-                        .expression("aql:self.setDocumentationBody(newValue)")
+                        .expression("aql:self.setNarrative(newValue)")
                         .build())
                 .build();
 
         var rendered = this.formBuilders.newRichTextDescription()
                 .name("OCFV-RichText-Preview")
                 .labelExpression("Rendered")
-                .valueExpression("aql:self.getDocumentationBody()")
+                .valueExpression("aql:self.getNarrative()")
                 // Disabled on purpose, and this is the whole point of splitting the two: a disabled
                 // rich-text widget renders Markdown with no toolbar and no editable surface, so
                 // none of the editor's shortcut handling is in play.
