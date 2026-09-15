@@ -66,6 +66,12 @@
 			<artifactId>sirius-web-application</artifactId>
 			<version>${sirius.web.version}</version>
 		</dependency>
+		<!-- Main: the narrative drafting task reads and writes an operational concept's
+		     narrative, and where that lives is defined once, in the module owning the concept. -->
+		<dependency>
+			<groupId>org.eclipse.syson</groupId>
+			<artifactId>syson-operational-concept-library</artifactId>
+		</dependency>
 		<!-- Main: DeleteService, used to roll an element back out of the model when its
 		     provenance stamp fails to apply. -->
 		<dependency>

@@ -29,7 +29,8 @@ import org.eclipse.sirius.components.emf.services.api.IEMFEditingContext;
 import org.eclipse.sirius.components.representations.Message;
 import org.eclipse.sirius.components.collaborative.api.ChangeKind;
 import org.eclipse.syson.ai.services.graphql.dto.ApplyAiProposalItemInput;
-import org.eclipse.syson.ai.services.pipeline.ProposalApplyService;
+import org.eclipse.syson.ai.services.generation.AiTaskRegistry;
+import org.eclipse.syson.ai.services.generation.IAiTask;
 import org.eclipse.syson.ai.services.proposal.AiProposal;
 import org.eclipse.syson.ai.services.proposal.AiProposalItem;
 import org.eclipse.syson.ai.services.proposal.IAiProposalRepository;
@@ -56,12 +57,12 @@ public class ApplyAiProposalItemEventHandler implements IEditingContextEventHand
 
     private final IAiProposalRepository proposalRepository;
 
-    private final ProposalApplyService applyService;
+    private final AiTaskRegistry taskRegistry;
 
-    public ApplyAiProposalItemEventHandler(IObjectSearchService objectSearchService, IAiProposalRepository proposalRepository, ProposalApplyService applyService) {
+    public ApplyAiProposalItemEventHandler(IObjectSearchService objectSearchService, IAiProposalRepository proposalRepository, AiTaskRegistry taskRegistry) {
         this.objectSearchService = Objects.requireNonNull(objectSearchService);
         this.proposalRepository = Objects.requireNonNull(proposalRepository);
-        this.applyService = Objects.requireNonNull(applyService);
+        this.taskRegistry = Objects.requireNonNull(taskRegistry);
     }
 
     @Override
@@ -103,7 +104,16 @@ public class ApplyAiProposalItemEventHandler implements IEditingContextEventHand
     private IPayload doApply(ApplyAiProposalItemInput input, IEMFEditingContext emfEditingContext, Sinks.Many<ChangeDescription> changeDescriptionSink,
             IEditingContext editingContext, AiProposal proposal, AiProposalItem item, Element parent) {
         var messages = new ArrayList<Message>();
-        boolean applied = this.applyService.apply(emfEditingContext, parent, proposal, item, messages);
+        // Applying is the task's business, not this handler's: creating elements and replacing a
+        // narrative are different operations, and the proposal records which task produced it.
+        Optional<IAiTask> optionalTask = this.taskRegistry.findByKind(proposal.getTaskKind());
+        boolean applied = false;
+        if (optionalTask.isPresent()) {
+            applied = optionalTask.get().apply(emfEditingContext, parent, proposal, item, messages);
+        } else {
+            messages.add(new Message("This proposal was produced by an assistant task that no longer exists: " + proposal.getTaskKind() + ".",
+                    org.eclipse.sirius.components.representations.MessageLevel.ERROR));
+        }
 
         IPayload payload;
         if (applied) {

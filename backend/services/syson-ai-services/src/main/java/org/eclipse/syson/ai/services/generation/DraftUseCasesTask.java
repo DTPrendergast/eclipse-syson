@@ -12,9 +12,18 @@
  *******************************************************************************/
 package org.eclipse.syson.ai.services.generation;
 
+import java.util.List;
 import java.util.Objects;
 
+import org.eclipse.sirius.components.emf.services.api.IEMFEditingContext;
+import org.eclipse.sirius.components.representations.Message;
+
+import org.eclipse.syson.ai.services.pipeline.ProposalApplyService;
+import org.eclipse.syson.ai.services.proposal.AiProposal;
+import org.eclipse.syson.ai.services.proposal.AiProposalItem;
 import org.eclipse.syson.ai.services.scope.SerializedModelScope;
+import org.eclipse.syson.ai.services.validation.GeneratedSysmlValidator;
+import org.eclipse.syson.ai.services.validation.ValidationResult;
 import org.eclipse.syson.sysml.Element;
 import org.eclipse.syson.sysml.UseCaseUsage;
 import org.springframework.stereotype.Service;
@@ -48,18 +57,24 @@ public class DraftUseCasesTask implements IAiTask {
 
             - Emit one `use case` declaration per candidate. Use `use case`, never `use case def`.
             - Give each a `doc` comment saying, in one or two sentences, who is doing what and to \
-              what end.
+            what end.
             - Name each after the goal being achieved, not the mechanism - `restorePower`, not \
-              `pressRestoreButton`.
+            `pressRestoreButton`.
             - Cover what the narrative actually describes. Where it implies an actor or a step \
-              without saying so outright, a use case is justified; where it says nothing, do not \
-              invent one.
+            without saying so outright, a use case is justified; where it says nothing, do not \
+            invent one.
             """ + TaskPrompts.COMMON_RULES;
 
     private final TaskPrompts prompts;
 
-    public DraftUseCasesTask(TaskPrompts prompts) {
+    private final GeneratedSysmlValidator validator;
+
+    private final ProposalApplyService applyService;
+
+    public DraftUseCasesTask(TaskPrompts prompts, GeneratedSysmlValidator validator, ProposalApplyService applyService) {
         this.prompts = Objects.requireNonNull(prompts);
+        this.validator = Objects.requireNonNull(validator);
+        this.applyService = Objects.requireNonNull(applyService);
     }
 
     @Override
@@ -67,9 +82,19 @@ public class DraftUseCasesTask implements IAiTask {
         return KIND;
     }
 
+    /**
+     * The gate that rejects prose. SysML v2 treats a bare name as an element declaration, so
+     * English parses cleanly - the parse proves nothing, and this type check is what decides
+     * whether a response is what was asked for.
+     */
     @Override
-    public Class<? extends Element> expectedKind() {
-        return UseCaseUsage.class;
+    public ValidationResult validate(String rawResponse) {
+        return this.validator.validate(rawResponse, UseCaseUsage.class);
+    }
+
+    @Override
+    public boolean apply(IEMFEditingContext editingContext, Element target, AiProposal proposal, AiProposalItem item, List<Message> messages) {
+        return this.applyService.apply(editingContext, target, proposal, item, messages);
     }
 
     @Override

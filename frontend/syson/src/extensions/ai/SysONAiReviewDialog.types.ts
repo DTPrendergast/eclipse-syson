@@ -115,6 +115,11 @@ export const AI_TASKS: AiTaskOption[] = [
     label: 'Draft use cases',
     hint: 'Drafts use cases from an operational concept narrative.',
   },
+  {
+    kind: 'draft-narrative',
+    label: 'Draft the narrative as prose',
+    hint: 'Rewrites an operational concept narrative from notes into prose. Accepting REPLACES the current narrative.',
+  },
 ];
 
 /**

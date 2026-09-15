@@ -12,6 +12,7 @@
  *******************************************************************************/
 package org.eclipse.syson.form.operational.concept.view.services;
 
+import org.eclipse.syson.operational.concept.library.OperationalConceptNarrativeService;
 import org.eclipse.syson.sysml.Documentation;
 import org.eclipse.syson.sysml.Element;
 import org.eclipse.syson.sysml.MetadataUsage;
@@ -38,6 +39,9 @@ import org.eclipse.syson.sysml.OwningMembership;
  */
 public class OCFVQueryServices {
 
+    /** Where the narrative actually lives is defined once, in the module that owns the concept. */
+    private final OperationalConceptNarrativeService narrativeService = new OperationalConceptNarrativeService();
+
     /**
      * The narrative, read from the operational concept annotation.
      *
@@ -46,15 +50,7 @@ public class OCFVQueryServices {
      * @return the narrative, or an empty string when none has been written yet
      */
     public String getNarrative(Element element) {
-        String body = "";
-        MetadataUsage annotation = this.operationalConceptAnnotation(element);
-        if (annotation != null) {
-            Documentation documentation = this.firstDocumentation(annotation);
-            if (documentation != null && documentation.getBody() != null) {
-                body = documentation.getBody();
-            }
-        }
-        return body;
+        return this.narrativeService.getNarrative(element);
     }
 
     /**
@@ -81,16 +77,7 @@ public class OCFVQueryServices {
      * @return the annotation, or null
      */
     public MetadataUsage operationalConceptAnnotation(Element element) {
-        return element.getOwnedRelationship().stream()
-                .filter(OwningMembership.class::isInstance)
-                .map(OwningMembership.class::cast)
-                .flatMap(owningMembership -> owningMembership.getOwnedRelatedElement().stream())
-                .filter(MetadataUsage.class::isInstance)
-                .map(MetadataUsage.class::cast)
-                .filter(metadataUsage -> metadataUsage.getMetadataDefinition() != null
-                        && "OperationalConcept".equals(metadataUsage.getMetadataDefinition().getName()))
-                .findFirst()
-                .orElse(null);
+        return this.narrativeService.findAnnotation(element);
     }
 
     /**

@@ -12,9 +12,18 @@
  *******************************************************************************/
 package org.eclipse.syson.ai.services.generation;
 
+import java.util.List;
 import java.util.Objects;
 
+import org.eclipse.sirius.components.emf.services.api.IEMFEditingContext;
+import org.eclipse.sirius.components.representations.Message;
+
+import org.eclipse.syson.ai.services.pipeline.ProposalApplyService;
+import org.eclipse.syson.ai.services.proposal.AiProposal;
+import org.eclipse.syson.ai.services.proposal.AiProposalItem;
 import org.eclipse.syson.ai.services.scope.SerializedModelScope;
+import org.eclipse.syson.ai.services.validation.GeneratedSysmlValidator;
+import org.eclipse.syson.ai.services.validation.ValidationResult;
 import org.eclipse.syson.sysml.Element;
 import org.eclipse.syson.sysml.RequirementUsage;
 import org.springframework.stereotype.Service;
@@ -34,15 +43,21 @@ public class DerivedRequirementsTask implements IAiTask {
             candidate derived requirements from requirements and system structure they give you.
 
             - Emit one `requirement` declaration per candidate, each with a `doc` comment stating \
-              the requirement in a single testable sentence.
+            the requirement in a single testable sentence.
             - Do not restate a requirement you were given. Propose only what is genuinely derived \
-              from it.
+            from it.
             """ + TaskPrompts.COMMON_RULES;
 
     private final TaskPrompts prompts;
 
-    public DerivedRequirementsTask(TaskPrompts prompts) {
+    private final GeneratedSysmlValidator validator;
+
+    private final ProposalApplyService applyService;
+
+    public DerivedRequirementsTask(TaskPrompts prompts, GeneratedSysmlValidator validator, ProposalApplyService applyService) {
         this.prompts = Objects.requireNonNull(prompts);
+        this.validator = Objects.requireNonNull(validator);
+        this.applyService = Objects.requireNonNull(applyService);
     }
 
     @Override
@@ -50,9 +65,19 @@ public class DerivedRequirementsTask implements IAiTask {
         return KIND;
     }
 
+    /**
+     * The gate that rejects prose. SysML v2 treats a bare name as an element declaration, so
+     * English parses cleanly - the parse proves nothing, and this type check is what decides
+     * whether a response is what was asked for.
+     */
     @Override
-    public Class<? extends Element> expectedKind() {
-        return RequirementUsage.class;
+    public ValidationResult validate(String rawResponse) {
+        return this.validator.validate(rawResponse, RequirementUsage.class);
+    }
+
+    @Override
+    public boolean apply(IEMFEditingContext editingContext, Element target, AiProposal proposal, AiProposalItem item, List<Message> messages) {
+        return this.applyService.apply(editingContext, target, proposal, item, messages);
     }
 
     @Override

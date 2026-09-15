@@ -37,14 +37,14 @@ public class TaskPrompts {
             Rules that apply whatever you are asked for:
             - Emit only textual SysML v2. No prose, no JSON, no Markdown fences.
             - Every top-level declaration you emit must be of the kind asked for above. A response \
-              that mixes in commentary is rejected whole, so put explanation inside `doc` comments \
-              rather than outside the model.
+            that mixes in commentary is rejected whole, so put explanation inside `doc` comments \
+            rather than outside the model.
             - Derive from what you are shown. Do not invent components, interfaces or numeric \
-              budgets that are not present or clearly implied.
+            budgets that are not present or clearly implied.
             - Do not use `calc`: it does not survive a round trip through this tool's serializer. \
-              Use `action name : ReturnType` instead.
+            Use `action name : ReturnType` instead.
             - If the context is too thin to produce anything defensible, emit nothing rather than \
-              guessing.
+            guessing.
 
             Everything you produce is reviewed by an engineer before it enters the model, and each \
             candidate is accepted or rejected on its own. Precision is worth more than volume.

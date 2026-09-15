@@ -895,12 +895,30 @@ body property was confirmed accepted (HTTP 200) by a minimal direct call. Every 
 still stubs the model call — that is deliberate, since tests must not spend money or depend on the
 network — so prompt quality remains judged by use rather than by assertion.
 
-**TODO:** add a narrative-rewrite task, proposing an improved operational-concept narrative as a
-reviewable candidate. **This is not a thin adapter.** A standalone `doc /* … */` parses to
-`Documentation`, so it is reviewable content, but applying it must *replace* the existing body,
-and every apply path today only ever adds — importing as-is would leave the package with two `doc`
-blocks. Needs replace-semantics in `ProposalApplyService` plus a rollback story for the case where
-the delete succeeds and the import fails.
+**Built 2026-09-14 — `draft-narrative`, the ConOps drafting task.** Turns an operational concept's
+notes into prose: bullets in, narrative out, reviewed before it replaces anything.
+
+It did not fit the existing shape, and forcing it to would have been wrong twice over. Its answer
+is **prose, not model elements**, so parsing it proves nothing — English parses cleanly as SysML,
+which is the whole reason the other tasks lean on a type check rather than the parser. And applying
+it **replaces** the narrative instead of adding an element, so the import-and-stamp path does not
+apply either. So `IAiTask` now owns validation and application as well as the prompt, and the
+pipeline and the apply handler delegate both. The element tasks share that behaviour by
+composition, not a base class: the architecture tests forbid business code in abstract classes and
+non-public constructors, and caught the first attempt.
+
+Where the narrative lives is defined once, in `OperationalConceptNarrativeService` in the
+operational-concept library module, because two very different callers need it — the form where a
+person edits it, and this task. Duplicating the traversal would have been two places to get the
+storage shape wrong.
+
+No provenance stamp on an applied narrative: it is a string on an element that already exists, not
+a new element, so there is nothing to annotate. The proposal row keeps prompt, model and timestamp.
+
+**An aside the tests caught:** Java text-block line continuations keep the indentation of the
+continued line, so every prompt in this module had stray double spaces mid-sentence in what the
+model actually read. Fixed in all four prompts, and a test now asserts no prompt contains a double
+space.
 
 **TODO:** spike diagram generation before building a task for it. `expose` is a real SysML v2
 keyword the serializer writes, and SysON renders only exposed elements, so a `ViewUsage` carrying

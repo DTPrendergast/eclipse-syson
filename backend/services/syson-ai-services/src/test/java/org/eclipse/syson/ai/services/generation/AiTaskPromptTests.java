@@ -26,7 +26,9 @@ import org.junit.jupiter.api.Test;
  */
 class AiTaskPromptTests {
 
-    private final DerivedRequirementsTask factory = new DerivedRequirementsTask(new TaskPrompts());
+    private final DerivedRequirementsTask factory = new DerivedRequirementsTask(new TaskPrompts(),
+            new org.eclipse.syson.ai.services.validation.GeneratedSysmlValidator(new org.eclipse.syson.sysml.SysmlToAst(null)),
+            org.mockito.Mockito.mock(org.eclipse.syson.ai.services.pipeline.ProposalApplyService.class));
 
     @Test
     void carriesTheInstructionAndTheSerializedModel() {
@@ -44,6 +46,15 @@ class AiTaskPromptTests {
 
         assertThat(request.systemPrompt()).contains("Emit only textual SysML v2");
         assertThat(request.systemPrompt()).doesNotContain("JSON schema");
+    }
+
+    @Test
+    void thePromptTextHasNoStrayDoubleSpacesFromLineContinuations() {
+        var request = this.factory.prompt(new SerializedModelScope("", 0, false, List.of()), "anything");
+
+        // Java text-block continuations keep the indentation of the continued line, which silently
+        // injects extra spaces mid-sentence into what the model reads.
+        assertThat(request.systemPrompt()).doesNotContain("  ");
     }
 
     @Test

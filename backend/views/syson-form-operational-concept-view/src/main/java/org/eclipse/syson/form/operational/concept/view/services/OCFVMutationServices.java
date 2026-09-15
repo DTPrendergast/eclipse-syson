@@ -12,11 +12,8 @@
  *******************************************************************************/
 package org.eclipse.syson.form.operational.concept.view.services;
 
-import org.eclipse.syson.sysml.Documentation;
+import org.eclipse.syson.operational.concept.library.OperationalConceptNarrativeService;
 import org.eclipse.syson.sysml.Element;
-import org.eclipse.syson.sysml.MetadataUsage;
-import org.eclipse.syson.sysml.OwningMembership;
-import org.eclipse.syson.sysml.SysmlFactory;
 
 /**
  * Writes the operational concept narrative back.
@@ -31,7 +28,7 @@ import org.eclipse.syson.sysml.SysmlFactory;
  */
 public class OCFVMutationServices {
 
-    private final OCFVQueryServices queryServices = new OCFVQueryServices();
+    private final OperationalConceptNarrativeService narrativeService = new OperationalConceptNarrativeService();
 
     /**
      * Sets the narrative, creating the {@code Documentation} on the annotation if there is none yet.
@@ -57,33 +54,10 @@ public class OCFVMutationServices {
             body = newValue;
         }
 
-        MetadataUsage annotation = this.queryServices.operationalConceptAnnotation(element);
-        if (annotation == null) {
-            // The form is only offered on elements that carry the annotation, so this means the
-            // marker was removed while the editor was open. Writing the narrative onto the element
-            // instead would put it somewhere nothing reads it back from, so nothing is written.
-            return element;
-        }
-
-        Documentation documentation = this.firstDocumentation(annotation);
-        if (documentation == null) {
-            documentation = SysmlFactory.eINSTANCE.createDocumentation();
-            OwningMembership owningMembership = SysmlFactory.eINSTANCE.createOwningMembership();
-            annotation.getOwnedRelationship().add(owningMembership);
-            owningMembership.getOwnedRelatedElement().add(documentation);
-        }
-        documentation.setBody(body);
+        // Returns false when the marker was removed while the editor was open; nothing is written
+        // in that case, deliberately.
+        this.narrativeService.setNarrative(element, body);
         return element;
     }
 
-    private Documentation firstDocumentation(Element element) {
-        return element.getOwnedRelationship().stream()
-                .filter(OwningMembership.class::isInstance)
-                .map(OwningMembership.class::cast)
-                .flatMap(owningMembership -> owningMembership.getOwnedRelatedElement().stream())
-                .filter(Documentation.class::isInstance)
-                .map(Documentation.class::cast)
-                .findFirst()
-                .orElse(null);
-    }
 }

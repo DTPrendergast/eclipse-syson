@@ -1,0 +1,154 @@
+/*******************************************************************************
+ * Copyright (c) 2026 Obeo.
+ * This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v2.0
+ * which accompanies this distribution, and is available at
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *     Obeo - initial API and implementation
+ *******************************************************************************/
+package org.eclipse.syson.ai.services.generation;
+
+import java.util.List;
+import java.util.Objects;
+
+import org.eclipse.sirius.components.emf.services.api.IEMFEditingContext;
+import org.eclipse.sirius.components.representations.Message;
+import org.eclipse.sirius.components.representations.MessageLevel;
+import org.eclipse.syson.ai.services.proposal.AiProposal;
+import org.eclipse.syson.ai.services.proposal.AiProposalItem;
+import org.eclipse.syson.ai.services.scope.SerializedModelScope;
+import org.eclipse.syson.ai.services.validation.GeneratedCandidate;
+import org.eclipse.syson.ai.services.validation.ValidationResult;
+import org.eclipse.syson.operational.concept.library.OperationalConceptNarrativeService;
+import org.eclipse.syson.sysml.Element;
+import org.springframework.stereotype.Service;
+
+/**
+ * Turns an operational concept's notes into prose.
+ *
+ * <p>
+ * This is the task that does not fit the shape of the others, and it is worth being explicit about
+ * why. Its answer is <em>prose</em>, not model elements. So parsing it would prove nothing - SysML
+ * v2 treats a bare name as a declaration, which means any English sentence parses cleanly - and
+ * applying it does not add anything to the model: it replaces the narrative that is already there.
+ * Both of those are why {@link IAiTask} owns validation and application rather than the pipeline.
+ * </p>
+ *
+ * <p>
+ * Because it replaces rather than adds, the review step matters more here than anywhere else: the
+ * candidate shown to the reviewer is the exact text that will overwrite their narrative, and
+ * nothing happens until they accept it.
+ * </p>
+ *
+ * @author DTPrendergast
+ */
+@Service
+public class DraftNarrativeTask implements IAiTask {
+
+    public static final String KIND = "draft-narrative";
+
+    private static final String SYSTEM_PROMPT = """
+            You are helping a systems engineer turn working notes into the narrative of an \
+            operational concept: a description of who uses a system and how they intend to use it.
+
+            You are given their current narrative, which may be rough - bullet points, fragments, \
+            half-finished sentences - along with the surrounding model.
+
+            Write it as clean prose:
+            - Keep every point they made. You are rewriting, not deciding what matters.
+            - Do not invent operators, systems, environments, numbers or constraints that are not \
+            in the notes or clearly implied by the model.
+            - Prefer plain declarative sentences about who does what, and why. Avoid marketing tone.
+            - Keep their Markdown headings, and use `## ` for sub-sections. A heading needs a space \
+            after the hashes or it is not a heading.
+            - Where a note is too vague to turn into a sentence without guessing, leave it as a \
+            bullet rather than inventing detail.
+
+            Reply with the narrative itself and nothing else. No preamble, no explanation of what \
+            you changed, no code fences. What you write is shown to the engineer and replaces their \
+            narrative verbatim if they accept it.
+            """;
+
+    private final TaskPrompts prompts;
+
+    private final OperationalConceptNarrativeService narrativeService;
+
+    public DraftNarrativeTask(TaskPrompts prompts, OperationalConceptNarrativeService narrativeService) {
+        this.prompts = Objects.requireNonNull(prompts);
+        this.narrativeService = Objects.requireNonNull(narrativeService);
+    }
+
+    @Override
+    public String kind() {
+        return KIND;
+    }
+
+    @Override
+    public GenerationRequest prompt(SerializedModelScope scope, String instruction) {
+        return new GenerationRequest(SYSTEM_PROMPT, this.prompts.userPrompt(scope, instruction));
+    }
+
+    /**
+     * Accepts the response as prose.
+     *
+     * <p>
+     * There is no parsing here on purpose. The only checks that mean anything for prose are that
+     * there is some, and that the model did not wrap it in a code fence despite being told not to.
+     * </p>
+     */
+    @Override
+    public ValidationResult validate(String rawResponse) {
+        String text = "";
+        if (rawResponse != null) {
+            text = rawResponse;
+        }
+        String stripped = this.stripCodeFences(text);
+        boolean fencesStripped = !stripped.equals(text.strip());
+
+        List<GeneratedCandidate> candidates = List.of();
+        if (!stripped.isBlank()) {
+            candidates = List.of(new GeneratedCandidate("Rewritten narrative", stripped));
+        }
+        return new ValidationResult(candidates, List.of(), List.of(), fencesStripped);
+    }
+
+    /**
+     * Replaces the narrative.
+     *
+     * <p>
+     * No provenance stamp: the narrative is a string on an element that already exists, not a new
+     * element, so there is nothing to annotate. The proposal row keeps the prompt, the model and
+     * the timestamp, and a reviewer accepted the text knowingly.
+     * </p>
+     */
+    @Override
+    public boolean apply(IEMFEditingContext editingContext, Element target, AiProposal proposal, AiProposalItem item, List<Message> messages) {
+        boolean written = this.narrativeService.setNarrative(target, item.getSysmlFragment());
+        if (written) {
+            item.applied(target.getElementId());
+        } else {
+            messages.add(new Message("That element is not an operational concept, so there is no narrative to replace.", MessageLevel.ERROR));
+        }
+        return written;
+    }
+
+    private String stripCodeFences(String text) {
+        String result = text.strip();
+        if (result.startsWith("```")) {
+            int firstLineEnd = result.indexOf('\n');
+            if (firstLineEnd >= 0) {
+                result = result.substring(firstLineEnd + 1);
+            }
+            if (result.stripTrailing().endsWith("```")) {
+                result = result.stripTrailing();
+                result = result.substring(0, result.length() - 3);
+            }
+            result = result.strip();
+        }
+        return result;
+    }
+}

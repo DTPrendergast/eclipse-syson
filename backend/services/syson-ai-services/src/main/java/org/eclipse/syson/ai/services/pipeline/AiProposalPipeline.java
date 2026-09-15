@@ -23,7 +23,6 @@ import org.eclipse.syson.ai.services.proposal.AiProposal;
 import org.eclipse.syson.ai.services.proposal.AiProposalItem;
 import org.eclipse.syson.ai.services.proposal.IAiProposalRepository;
 import org.eclipse.syson.ai.services.scope.SerializedModelScope;
-import org.eclipse.syson.ai.services.validation.GeneratedSysmlValidator;
 import org.eclipse.syson.ai.services.validation.ValidationResult;
 import org.springframework.stereotype.Service;
 
@@ -53,13 +52,10 @@ public class AiProposalPipeline {
 
     private final IGenerationClient generationClient;
 
-    private final GeneratedSysmlValidator validator;
-
     private final IAiProposalRepository proposalRepository;
 
-    public AiProposalPipeline(IGenerationClient generationClient, GeneratedSysmlValidator validator, IAiProposalRepository proposalRepository) {
+    public AiProposalPipeline(IGenerationClient generationClient, IAiProposalRepository proposalRepository) {
         this.generationClient = Objects.requireNonNull(generationClient);
-        this.validator = Objects.requireNonNull(validator);
         this.proposalRepository = Objects.requireNonNull(proposalRepository);
     }
 
@@ -96,7 +92,9 @@ public class AiProposalPipeline {
      * Validates what came back and, if it holds up, stores it for review.
      */
     private GenerationOutcome review(String projectId, String instruction, String author, GenerationResult generation, IAiTask task) {
-        ValidationResult validation = this.validator.validate(generation.text(), task.expectedKind());
+        // The task decides what a usable answer looks like: parsing and a type check for model
+        // elements, something else entirely for prose.
+        ValidationResult validation = task.validate(generation.text());
 
         GenerationOutcome outcome;
         if (!validation.isValid()) {

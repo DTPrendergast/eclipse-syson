@@ -84,14 +84,15 @@ class AiProposalPipelineTests {
 
     private final IGenerationClient generationClient = mock(IGenerationClient.class);
 
-    private final DerivedRequirementsTask derivedRequirements = new DerivedRequirementsTask(new TaskPrompts());
+    private final GeneratedSysmlValidator validator = new GeneratedSysmlValidator(new SysmlToAst(null));
 
-    private final DraftUseCasesTask draftUseCases = new DraftUseCasesTask(new TaskPrompts());
+    private final ProposalApplyService applyService = mock(ProposalApplyService.class);
 
-    private final AiProposalPipeline pipeline = new AiProposalPipeline(
-            this.generationClient,
-            new GeneratedSysmlValidator(new SysmlToAst(null)),
-            this.repository);
+    private final DerivedRequirementsTask derivedRequirements = new DerivedRequirementsTask(new TaskPrompts(), this.validator, this.applyService);
+
+    private final DraftUseCasesTask draftUseCases = new DraftUseCasesTask(new TaskPrompts(), this.validator, this.applyService);
+
+    private final AiProposalPipeline pipeline = new AiProposalPipeline(this.generationClient, this.repository);
 
     @Test
     void storesOneReviewableItemPerCandidate() {
