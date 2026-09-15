@@ -3,6 +3,11 @@
 Four capabilities layered onto Eclipse SysON (base: upstream tag `v2026.7.4`).
 Read `CLAUDE.md` first for architectural constraints.
 
+**Deferred work is tagged `TODO:`** at the start of a line, so `grep -n '^\*\*TODO:' plan.md`
+lists everything this document knows is outstanding. A `TODO:` here means a deliberate decision to
+not do something yet, with the reason attached — not a forgotten note. (The one bare `TODO` further
+down is quoted from upstream's own source, not one of ours.)
+
 **Recommended order:** 3 → 4 → 2 → 1. Items 3 and 4 are mostly model-library and view
 wiring, which is low risk and teaches the view-description patterns needed for item 2.
 Item 1 depends on knowing the mutation services well, so it comes last.
@@ -56,8 +61,10 @@ the one genuine gap.
    (checked `SDVNodeToolSectionSwitch`/`SDVDiagramDescriptionProvider` in
    `syson-standard-diagrams-view`: `AnalysisCaseDefinition`/`UseCaseDefinition` are wired
    in, `VerificationCase*` is not) — that's curated per-type in upstream diagram-view Java,
-   not metamodel-driven, and editing it means touching upstream files. Deferred: not
-   required by this item's acceptance criterion, which doesn't involve a diagram.
+   not metamodel-driven, and editing it means touching upstream files.
+   **TODO:** add a `VerificationCase*` diagram palette entry. Deferred because it is not required
+   by this item's acceptance criterion, which doesn't involve a diagram, and because it means
+   editing upstream files.
 4. **A verification table view** (see item 2 — same pattern as the requirements table,
    new Maven module `backend/views/syson-table-verification-view`). **Status: done**, with
    caveats:
@@ -80,7 +87,8 @@ the one genuine gap.
      verified: interactively opening the table in a browser and editing a cell — stopped
      short of a full GraphQL-driven round trip (create project → find root object →
      create representation → edit cell) since it isn't a small check, and the read/write
-     logic is already covered at the unit level. Worth doing before calling this
+     logic is already covered at the unit level.
+     **TODO:** exercise the verification table interactively in a browser before calling it
      production-ready.
    - Row creation ("Create verification case" tool) mirrors the requirements table's
      pattern; unlike it, there's no "import existing" tool.
@@ -161,6 +169,13 @@ composition), and see it distinguished in the explorer (new icon delegate) — a
 
 ---
 
+**TODO:** give operational concepts a first-class creation affordance. Today one is created by
+pasting textual SysML through the explorer's "New objects from text" and annotating the package
+`@OperationalConceptLibrary::OperationalConcept;` — **qualified**, since the unqualified form
+resolves to nothing silently. A tree-item context-menu contribution (the same extension point
+`InsertTextualSysMLMenuContribution` uses) would stamp the marker instead of asking the user to
+know the incantation.
+
 ### 2a. Operational concept narrative editor (2026-09-14)
 
 `backend/views/syson-form-operational-concept-view` opens an operational concept's documentation
@@ -216,6 +231,26 @@ Two genuine platform limits remain, independent of that. The rich-text toolbar o
 paragraph, Header 1, code, bold, italic and strikethrough, so H2–H6, quote and lists are
 shortcut-only. And the renderer's theme styles only `h1` and `h2`, so `###` and deeper render as
 real headings with no visual distinction.
+
+**TODO:** give `###` and deeper a distinct appearance in the rendered preview. This is **not** a
+Markdown or Lexical limitation — `### ` parses correctly and Lexical emits a real `<h3>`; the
+component's theme simply maps `h1` and `h2` only
+(`heading: { h1: …, h2: … }` in `MarkdownRenderer`). Two routes, both checked:
+- **Ours, ~20 lines of CSS.** The form container carries `data-testid="form"`, giving a stable
+  enough hook for `[data-testid='form'] h3 { … }` in a stylesheet imported from
+  `frontend/syson/src/index.tsx`. No fork, no vendored component. The catch is that it styles by
+  reaching into the platform's DOM through a test attribute, so it decays silently if Sirius Web
+  restructures the form, and it applies to every form including the Details panel.
+- **Upstream, ~1 line.** Adding `h3`–`h6` to that theme map is a small uncontroversial patch that
+  would benefit everyone, and is a far better upstream report than the shortcut "bug" above.
+
+Shelved 2026-09-14 as good enough: `#` and `##` are styled, which covers the section levels a
+ConOps outline actually needs.
+
+**TODO:** decide whether Markdown tables are needed in narratives. `@lexical/markdown`'s default
+`TRANSFORMERS` — which the component uses unmodified — has no `TABLE` transformer, so a table stays
+literal pipe characters, and a round trip through the editor may not preserve one. Adding it means
+overriding the widget on the frontend, which is a bigger step than the CSS above.
 
 ---
 
@@ -533,7 +568,9 @@ not assumed:
    reserved `objective` keyword and the unescapable quote from item 3. Emit
    `action name : ReturnType` instead. This is an upstream serializer gap, not ours, and it
    means the cross-cutting "export/reimport is lossless" check fails today for any model
-   using `calc`, independent of this item. Worth reporting upstream.
+   using `calc`, independent of this item.
+   **TODO:** report the `calc` serializer gap upstream — `SysMLElementSerializer` has no
+   `caseCalculationUsage`, so `calc` silently becomes `action` on export.
 
 **Decisions taken (2026-09-07).**
 
@@ -758,8 +795,11 @@ Three things this cost, each a silent failure that booting the application does 
 client-supplied author would let a caller stamp anyone's name on generated content, which is
 worse than recording nothing because it looks authoritative. There is no server-side identity in
 this codebase to read (nothing uses `SecurityContextHolder`), so the author is recorded as
-`unknown` until that is wired. **This must be resolved before provenance here is treated as an
-audit record.**
+`ai-assistant`, which names the origin of the content rather than a person — accepted by the user
+as sufficient for now.
+**TODO:** wire provenance to a real server-side identity before this is treated as an audit
+record. Recording *who* asked, as opposed to *what* produced it, needs an identity mechanism this
+codebase does not yet have.
 
 **Built next — the review UI.**
 
@@ -824,10 +864,27 @@ The mutation is now `generateAiProposal` with an explicit `task` field. An unkno
 reported rather than defaulted — silently running a different task would put candidates of an
 unexpected kind in front of a reviewer.
 
-**Item 4 backend and UI are complete.** What has never happened is a single real API call: there
-is no key configured in this environment, so every test to date stubs the model call. Prompt
-quality, the validator's strictness against real model output, and the fallback wire shape are
-all unverified against the live API. That is the next thing to do, and it needs a key.
+**Item 4 backend and UI are complete, and have run against the real API** (2026-09-09): a key was
+supplied, a generation ran from the UI and returned usable candidates, and the untyped `fallbacks`
+body property was confirmed accepted (HTTP 200) by a minimal direct call. Every automated test
+still stubs the model call — that is deliberate, since tests must not spend money or depend on the
+network — so prompt quality remains judged by use rather than by assertion.
+
+**TODO:** add a narrative-rewrite task, proposing an improved operational-concept narrative as a
+reviewable candidate. **This is not a thin adapter.** A standalone `doc /* … */` parses to
+`Documentation`, so it is reviewable content, but applying it must *replace* the existing body,
+and every apply path today only ever adds — importing as-is would leave the package with two `doc`
+blocks. Needs replace-semantics in `ProposalApplyService` plus a rollback story for the case where
+the delete succeeds and the import fails.
+
+**TODO:** spike diagram generation before building a task for it. `expose` is a real SysML v2
+keyword the serializer writes, and SysON renders only exposed elements, so a `ViewUsage` carrying
+`expose` statements should populate a General or Interconnection View with no diagram-specific
+write API — verified in the code, never exercised. The cheap test is to hand-write that fragment,
+import it through the existing apply path, and see whether a view actually renders. Layout stays
+Sirius Web's either way: the model would control diagram *content*, never arrangement. The failure
+mode to design against is creating elements without exposing them, which reads as a broken feature
+rather than a missing statement.
 
 **Sequencing.** The seven goals share one pipeline — scope selection → serialize context →
 LLM call → parse and validate returned SysML → diff → apply with provenance — and differ
