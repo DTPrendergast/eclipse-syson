@@ -18,6 +18,7 @@ import org.eclipse.sirius.components.view.builder.generated.view.ViewBuilders;
 import org.eclipse.sirius.components.view.builder.providers.IColorProvider;
 import org.eclipse.sirius.components.view.builder.providers.IRepresentationDescriptionProvider;
 import org.eclipse.sirius.components.view.form.GroupDescription;
+import org.eclipse.sirius.components.view.form.GroupDisplayMode;
 import org.eclipse.syson.sysml.SysmlPackage;
 import org.eclipse.syson.util.AQLConstants;
 import org.eclipse.syson.util.SysMLMetamodelHelper;
@@ -44,7 +45,15 @@ import org.eclipse.syson.util.SysMLMetamodelHelper;
  * </p>
  *
  * <p>
- * The preview refreshes when the textarea loses focus, because that is when the form commits and
+ * The two are toggled rather than stacked. The platform's form renderer lays groups out itself and
+ * offers no splitter, so a draggable divider is not reachable from the view DSL; what it does offer
+ * is {@code TOGGLEABLE_AREAS}, which shows one widget of a group at a time and gives it the whole
+ * area. Writing and reading a narrative are separate activities, so switching between them beats
+ * splitting the panel anyway.
+ * </p>
+ *
+ * <p>
+ * The preview refreshes when the source loses focus, because that is when the form commits and
  * re-reads the value - so it updates at the end of an edit rather than on every keystroke.
  * </p>
  *
@@ -64,7 +73,7 @@ public class OCFVFormDescriptionProvider implements IRepresentationDescriptionPr
 
         var source = this.formBuilders.newTextAreaDescription()
                 .name("OCFV-TextArea-Narrative")
-                .labelExpression("Narrative (Markdown source)")
+                .labelExpression("Source")
                 .helpExpression("Who uses this system, and how do they intend to use it? Written as Markdown; the rendered form is below.")
                 .valueExpression("aql:self.getDocumentationBody()")
                 .body(this.viewBuilders.newChangeContext()
@@ -82,18 +91,15 @@ public class OCFVFormDescriptionProvider implements IRepresentationDescriptionPr
                 .isEnabledExpression(AQLConstants.AQL_FALSE)
                 .build();
 
-        GroupDescription editing = this.formBuilders.newGroupDescription()
-                .name("OCFV-Group-Source")
+        // One group, not two. TOGGLEABLE_AREAS puts a toggle button on each *widget of a group*
+        // and renders only the selected one, so a single group is what gives source and preview the
+        // whole panel in turn. Two groups would stack two separate toggles instead.
+        GroupDescription narrativeGroup = this.formBuilders.newGroupDescription()
+                .name("OCFV-Group-Narrative")
                 .labelExpression("Operational concept")
+                .displayMode(GroupDisplayMode.TOGGLEABLE_AREAS)
                 .semanticCandidatesExpression("aql:self")
-                .children(source)
-                .build();
-
-        GroupDescription preview = this.formBuilders.newGroupDescription()
-                .name("OCFV-Group-Rendered")
-                .labelExpression("Preview")
-                .semanticCandidatesExpression("aql:self")
-                .children(rendered)
+                .children(source, rendered)
                 .build();
 
         var page = this.formBuilders.newPageDescription()
@@ -101,7 +107,7 @@ public class OCFVFormDescriptionProvider implements IRepresentationDescriptionPr
                 .labelExpression("aql:self.name")
                 .domainType(domainType)
                 .semanticCandidatesExpression("aql:self")
-                .groups(editing, preview)
+                .groups(narrativeGroup)
                 .build();
 
         return this.formBuilders.newFormDescription()

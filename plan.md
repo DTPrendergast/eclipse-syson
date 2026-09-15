@@ -192,20 +192,30 @@ be valid SysML and would export as two `doc` blocks.
 
 **Sizing is fine** — the editor fills the main panel (confirmed in use).
 
-**Editing is plain text, rendering is separate and read-only, and that split is a workaround for
-an upstream bug.** The platform's rich-text widget is a Lexical WYSIWYG editor whose Markdown
-shortcuts stop firing after the first transform: type `# ` on a second line and the hash stays
-literal. That is a bug in `sirius-components-markdown`, which this fork does not own, and fixing
-it would mean owning an editor component. So the narrative is authored in a `TextArea` as raw
-Markdown — no Lexical, no shortcut handling, nothing to go wrong — and a second group shows the
-rendered form as a `RichText` widget with `isEnabledExpression` false. A disabled rich-text widget
-renders with no toolbar and no editable surface, which is exactly a static rendered view, at the
-cost of no code we have to maintain. The preview refreshes when the textarea loses focus, since
-that is when the form commits, so it updates at the end of an edit rather than per keystroke.
+**Editing is plain text; rendering is separate, read-only, and toggled.** The narrative is
+authored in a `TextArea` as raw Markdown and the rendered form is a `RichText` widget with
+`isEnabledExpression` false — disabled, so it renders with no toolbar and no editable surface,
+which is a static rendered view at the cost of no code to maintain. Both live in **one**
+`GroupDescription` with `TOGGLEABLE_AREAS`, which puts a toggle button on each widget of a group
+and renders only the selected one, so whichever you are using gets the whole panel. A draggable
+divider is not reachable from the view DSL: the form renderer owns group layout and offers only
+`LIST` or `TOGGLEABLE_AREAS`. The preview refreshes when the source loses focus, since that is
+when the form commits.
 
-Worth knowing about the widget if it is ever used for editing again: its toolbar offers only
-paragraph, Header 1, code, bold, italic and strikethrough — H2–H6, quote and lists are reachable
-**only** through the shortcuts that are broken.
+**A correction worth keeping.** This split was first written up here as a workaround for a defect
+in `sirius-components-markdown` — "Markdown shortcuts stop firing after the first transform". That
+was very likely never a defect. Reading the stored narrative out of the database showed every
+heading written as `#Introduction`, with **no space after the hash**; the transformer regex is
+`^(#{1,6})\s` and CommonMark agrees that is not a heading anywhere. The reported symptom — first
+heading worked, later ones did not — fits a missing space exactly. The lesson is the general one:
+check the input before concluding the platform is broken. The split is kept on its own merits, not
+as a workaround: raw Markdown is predictable and survives export to textual SysML as exactly what
+was typed.
+
+Two genuine platform limits remain, independent of that. The rich-text toolbar offers only
+paragraph, Header 1, code, bold, italic and strikethrough, so H2–H6, quote and lists are
+shortcut-only. And the renderer's theme styles only `h1` and `h2`, so `###` and deeper render as
+real headings with no visual distinction.
 
 ---
 
