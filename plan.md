@@ -971,6 +971,41 @@ items carrying provenance metadata.
 
 ## Cross-cutting
 
+**TODO (serious, affects every item): metadata annotations are not serialized, so nothing this
+fork stores as metadata survives export to textual SysML v2.** Measured 2026-09-14:
+
+| authored | exported |
+| --- | --- |
+| `package Ops { @…::OperationalConcept; part dispatcher; }` | `package Ops { part dispatcher; }` — marker gone |
+| `package Ops { @…::OperationalConcept { doc /* narrative */ } }` | `package Ops;` — marker and narrative gone |
+| `requirement <R1> r1 { @…::VerificationProcedure { procedureId = "SYS-TP-014"; } }` | `requirement <R1> r1 { item { = "SYS-TP-014"; } }` — **malformed**, definition and attribute names lost |
+| `part def Battery { @…::OperationalConcept; }` | `part def Battery;` — marker gone |
+
+Root cause: `SysMLElementSerializer` has a `caseMetadataDefinition` (defining metadata in a
+library) but no `caseMetadataUsage` (applying one), and it **explicitly filters metadata usages
+out** of children serialization — `isMetadataUsage().negate()` at lines 699 and 942.
+
+This is not a small gap. CLAUDE.md's hard constraint is to model user-defined concepts as SysML
+metadata rather than in Java, and every item did exactly that, so the data at risk is:
+
+- **Item 1:** verification procedure IDs and `VerificationMethod`. Item 1's acceptance criterion —
+  "export the model to textual SysML v2, and reimport it without loss" — **is therefore not met**,
+  and the claim above that it was should not be trusted.
+- **Item 2:** the `OperationalConcept` marker, and now the narrative attached to it.
+- **Item 3:** every requirements-table attribute (category, threshold/objective, parent
+  requirements, verification link).
+- **Item 4:** `@Generated` provenance — generated content would come back from a round trip
+  indistinguishable from hand-authored content, which is the exact failure that library exists to
+  prevent.
+
+Nothing is broken in the database; this bites only on export, and the malformed
+`item { = "…" }` output suggests a reimport would fail or produce garbage rather than quietly
+losing data. Options: patch `SysMLElementSerializer` (upstream file, so a rebase cost, and it
+wants an upstream report either way), or accept that metadata is database-only and stop claiming
+lossless round trips. **This is a decision for the user, not a quiet fix.**
+
+
+
 - **Rebase discipline.** Upstream commits daily and tags frequently (`v2026.7.0` through
   `v2026.7.4` in one cycle). Pin to a tag, rebase deliberately, keep our code in separate
   modules.
