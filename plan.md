@@ -190,8 +190,22 @@ arbitrary user text in a SysML string literal, which cannot represent an unescap
 A test asserts that editing twice leaves **one** `Documentation`, not two — two bodies would both
 be valid SysML and would export as two `doc` blocks.
 
-**Not yet verified:** how the widget sizes in practice. It may render as a modest box rather than
-filling the panel, which only running it shows.
+**Sizing is fine** — the editor fills the main panel (confirmed in use).
+
+**Editing is plain text, rendering is separate and read-only, and that split is a workaround for
+an upstream bug.** The platform's rich-text widget is a Lexical WYSIWYG editor whose Markdown
+shortcuts stop firing after the first transform: type `# ` on a second line and the hash stays
+literal. That is a bug in `sirius-components-markdown`, which this fork does not own, and fixing
+it would mean owning an editor component. So the narrative is authored in a `TextArea` as raw
+Markdown — no Lexical, no shortcut handling, nothing to go wrong — and a second group shows the
+rendered form as a `RichText` widget with `isEnabledExpression` false. A disabled rich-text widget
+renders with no toolbar and no editable surface, which is exactly a static rendered view, at the
+cost of no code we have to maintain. The preview refreshes when the textarea loses focus, since
+that is when the form commits, so it updates at the end of an edit rather than per keystroke.
+
+Worth knowing about the widget if it is ever used for editing again: its toolbar offers only
+paragraph, Header 1, code, bold, italic and strikethrough — H2–H6, quote and lists are reachable
+**only** through the shortcuts that are broken.
 
 ---
 

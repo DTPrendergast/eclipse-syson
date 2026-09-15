@@ -19,6 +19,7 @@ import org.eclipse.sirius.components.view.builder.providers.IColorProvider;
 import org.eclipse.sirius.components.view.builder.providers.IRepresentationDescriptionProvider;
 import org.eclipse.sirius.components.view.form.GroupDescription;
 import org.eclipse.syson.sysml.SysmlPackage;
+import org.eclipse.syson.util.AQLConstants;
 import org.eclipse.syson.util.SysMLMetamodelHelper;
 
 /**
@@ -32,8 +33,19 @@ import org.eclipse.syson.util.SysMLMetamodelHelper;
  * </p>
  *
  * <p>
- * No new frontend code was needed: {@code RichTextPropertySection} already exists on the client and
- * already round-trips through an edit mutation. This declares the widget; the platform renders it.
+ * <b>Editing is plain text; rendering is separate and read-only.</b> The platform's rich-text
+ * widget is a Lexical WYSIWYG editor, and its Markdown shortcuts stop firing after the first
+ * transform - type {@code # } on a second line and the hash stays as literal text. That is an
+ * upstream bug in {@code sirius-components-markdown}, not something this view can fix without
+ * owning an editor component, so the narrative is authored in a textarea as raw Markdown where no
+ * shortcut handling is involved at all, and the rendered form appears beneath it as a disabled
+ * rich-text widget. A disabled widget renders without a toolbar and without an editable surface,
+ * which is exactly the static rendered view wanted, and it uses no code we would have to maintain.
+ * </p>
+ *
+ * <p>
+ * The preview refreshes when the textarea loses focus, because that is when the form commits and
+ * re-reads the value - so it updates at the end of an edit rather than on every keystroke.
  * </p>
  *
  * @author DTPrendergast
@@ -50,21 +62,38 @@ public class OCFVFormDescriptionProvider implements IRepresentationDescriptionPr
     public RepresentationDescription create(IColorProvider colorProvider) {
         String domainType = SysMLMetamodelHelper.buildQualifiedName(SysmlPackage.eINSTANCE.getElement());
 
-        var narrative = this.formBuilders.newRichTextDescription()
-                .name("OCFV-RichText-Narrative")
-                .labelExpression("Narrative")
-                .helpExpression("Who uses this system, and how do they intend to use it? Markdown is rendered.")
+        var source = this.formBuilders.newTextAreaDescription()
+                .name("OCFV-TextArea-Narrative")
+                .labelExpression("Narrative (Markdown source)")
+                .helpExpression("Who uses this system, and how do they intend to use it? Written as Markdown; the rendered form is below.")
                 .valueExpression("aql:self.getDocumentationBody()")
                 .body(this.viewBuilders.newChangeContext()
                         .expression("aql:self.setDocumentationBody(newValue)")
                         .build())
                 .build();
 
-        GroupDescription group = this.formBuilders.newGroupDescription()
-                .name("OCFV-Group")
+        var rendered = this.formBuilders.newRichTextDescription()
+                .name("OCFV-RichText-Preview")
+                .labelExpression("Rendered")
+                .valueExpression("aql:self.getDocumentationBody()")
+                // Disabled on purpose, and this is the whole point of splitting the two: a disabled
+                // rich-text widget renders Markdown with no toolbar and no editable surface, so
+                // none of the editor's shortcut handling is in play.
+                .isEnabledExpression(AQLConstants.AQL_FALSE)
+                .build();
+
+        GroupDescription editing = this.formBuilders.newGroupDescription()
+                .name("OCFV-Group-Source")
                 .labelExpression("Operational concept")
                 .semanticCandidatesExpression("aql:self")
-                .children(narrative)
+                .children(source)
+                .build();
+
+        GroupDescription preview = this.formBuilders.newGroupDescription()
+                .name("OCFV-Group-Rendered")
+                .labelExpression("Preview")
+                .semanticCandidatesExpression("aql:self")
+                .children(rendered)
                 .build();
 
         var page = this.formBuilders.newPageDescription()
@@ -72,7 +101,7 @@ public class OCFVFormDescriptionProvider implements IRepresentationDescriptionPr
                 .labelExpression("aql:self.name")
                 .domainType(domainType)
                 .semanticCandidatesExpression("aql:self")
-                .groups(group)
+                .groups(editing, preview)
                 .build();
 
         return this.formBuilders.newFormDescription()
