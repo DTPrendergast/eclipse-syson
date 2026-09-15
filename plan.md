@@ -161,6 +161,40 @@ composition), and see it distinguished in the explorer (new icon delegate) — a
 
 ---
 
+### 2a. Operational concept narrative editor (2026-09-14)
+
+`backend/views/syson-form-operational-concept-view` opens an operational concept's documentation
+body as an editable Markdown document **in the main editor panel**, beside diagrams and tables.
+
+The research that made this cheap, all verified in the platform rather than assumed:
+
+- `sirius-components-markdown` exports only a read-only `MarkdownRenderer` — but it is consumed by
+  **`RichTextPropertySection`** in `sirius-components-forms`, which renders Markdown *and* already
+  round-trips through an `editRichText` mutation.
+- The view DSL has `RichTextDescription` (`valueExpression`, `body`, `isEnabledExpression`) with a
+  `RichTextDescriptionBuilder`, and `ViewFormDescriptionConverter` turns a view-DSL form into a
+  real representation — which is what makes it open in the main panel rather than the Details side
+  panel.
+- **No frontend code and no platform change**, so CLAUDE.md's no-forking constraint never came into
+  play. There is deliberately no Markdown *representation* in Sirius Web; a form is the supported
+  way to get an editor into the main panel.
+
+Two design points. The marker is metadata, not a type, so it cannot be a `domainType` — offering
+the view is a `preconditionExpression` calling `isOperationalConcept()`, which uses the same test
+as the explorer's label delegate so the icon and the view can never disagree. And the body is
+edited **in place through EMF rather than through `ISysMLTextImporter`**: everywhere a *structure*
+is created this project lets the parser validate it, but a documentation body is free prose in a
+string attribute with no syntax to check, and routing it through the importer would mean embedding
+arbitrary user text in a SysML string literal, which cannot represent an unescaped quote (item 3).
+
+A test asserts that editing twice leaves **one** `Documentation`, not two — two bodies would both
+be valid SysML and would export as two `doc` blocks.
+
+**Not yet verified:** how the widget sizes in practice. It may render as a modest box rather than
+filling the panel, which only running it shows.
+
+---
+
 ## 3. Requirements table
 
 **Goal:** Add requirements by adding a row; add columns, including one mapping to a
