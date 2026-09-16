@@ -14,6 +14,16 @@ export interface SysONAiReviewDialogProps {
   editingContextId: string;
   open: boolean;
   onClose: () => void;
+  /**
+   * The element to work from. When given, the dialog uses it instead of the explorer selection -
+   * which is the point of opening the assistant from an element's own context menu, where there is
+   * no ambiguity about what was meant.
+   */
+  elementId?: string;
+  /** Preselected task, for an entry that exists to run one particular task. */
+  initialTask?: string;
+  /** Overrides the dialog title when opened for one task. */
+  title?: string;
 }
 
 export interface GQLProposedItem {

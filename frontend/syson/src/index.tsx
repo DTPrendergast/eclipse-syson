@@ -21,6 +21,11 @@ import {
   SiriusWebApplication,
 } from '@eclipse-sirius/sirius-web-application';
 import {
+  GQLTreeItemContextMenuEntry,
+  treeItemContextMenuEntryOverrideExtensionPoint,
+  TreeItemContextMenuOverrideContribution,
+} from '@eclipse-sirius/sirius-components-trees';
+import {
   sysONExtensionRegistry,
   SysONExtensionRegistryMergeStrategy,
   sysONNodeTypeRegistry,
@@ -29,6 +34,10 @@ import { createRoot } from 'react-dom/client';
 
 import { httpOrigin, wsOrigin } from './core/URL';
 import { SysONAiAssistantMenuEntry } from './extensions/ai/SysONAiAssistantMenuEntry';
+import {
+  AiDraftNarrativeMenuContribution,
+  AiDraftUseCasesMenuContribution,
+} from './extensions/ai/SysONAiTreeMenuContributions';
 import { SysONFooter } from './extensions/SysONFooter';
 import { SysONNavigationBarIcon } from './extensions/SysONNavigationBarIcon';
 import { sysonTheme } from './theme/sysonTheme';
@@ -37,6 +46,7 @@ import '@fontsource/roboto/300.css';
 import '@fontsource/roboto/400.css';
 import '@fontsource/roboto/500.css';
 import '@fontsource/roboto/700.css';
+import './extensions/ai/operationalConceptView.css';
 import './ReactFlow.css';
 
 if (process.env.NODE_ENV !== 'production') {
@@ -63,6 +73,39 @@ sysONExtensionRegistry.addComponent(editProjectNavbarMenuEntryExtensionPoint, {
   identifier: `syson_ai_${editProjectNavbarMenuEntryExtensionPoint.identifier}`,
   Component: SysONAiAssistantMenuEntry,
 });
+
+/*
+ * The assistant's tasks appear on the context menu of the element they apply to, which is what
+ * makes them unambiguous: the entry knows which element it was opened on, where the project menu
+ * could only read the explorer selection - and a selection can be a document or a representation
+ * rather than a model element.
+ *
+ * Appended to SysON's own contributions rather than registered separately: the registry keeps one
+ * data extension per extension point, so a second putData would replace SysON's entries and take
+ * "New objects from text" and the expression entries with it.
+ */
+const existingTreeItemContributions =
+  sysONExtensionRegistry.getData<TreeItemContextMenuOverrideContribution[]>(
+    treeItemContextMenuEntryOverrideExtensionPoint
+  )?.data ?? [];
+
+sysONExtensionRegistry.putData<TreeItemContextMenuOverrideContribution[]>(
+  treeItemContextMenuEntryOverrideExtensionPoint,
+  {
+    identifier: `syson_${treeItemContextMenuEntryOverrideExtensionPoint.identifier}`,
+    data: [
+      ...existingTreeItemContributions,
+      {
+        canHandle: (entry: GQLTreeItemContextMenuEntry) => entry.id === 'aiDraftNarrative',
+        component: AiDraftNarrativeMenuContribution,
+      },
+      {
+        canHandle: (entry: GQLTreeItemContextMenuEntry) => entry.id === 'aiDraftUseCases',
+        component: AiDraftUseCasesMenuContribution,
+      },
+    ],
+  }
+);
 
 const container = document.getElementById('root');
 const root = createRoot(container!);

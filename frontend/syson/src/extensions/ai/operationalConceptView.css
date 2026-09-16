@@ -1,0 +1,56 @@
+/*******************************************************************************
+ * Copyright (c) 2026 Obeo.
+ * This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v2.0
+ * which accompanies this distribution, and is available at
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *     Obeo - initial API and implementation
+ *******************************************************************************/
+
+/*
+ * Gives the Operational Concept View's narrative editor the height of the panel it sits in.
+ *
+ * Why this exists: sirius-components-forms hard-codes `maxRows: 4` for every textarea widget
+ * (TextfieldPropertySection), so a ConOps narrative is authored through a four-line slot however
+ * much room the panel has. There is no height option on TextAreaDescription in the view DSL, so
+ * this cannot be expressed on the backend.
+ *
+ * `!important` is doing real work here, not papering over specificity: MUI's TextareaAutosize
+ * writes the capped height as an inline style, and an inline style loses only to `!important`.
+ *
+ * Scoping: the selectors key on `data-testid`, which the platform sets from the widget's label.
+ * That keeps this off every other form in the application - notably the Details panel, whose
+ * textareas should stay small - at the cost of coupling this file to the label strings in
+ * OCFVFormDescriptionProvider. Rename a label there and the editor silently reverts to four rows.
+ */
+
+/*
+ * The offset covers the chrome above these panels: the application navbar, the representation
+ * tab bar, the form's page tabs, the group's toggle buttons and the widget label. It is measured
+ * by eye rather than computed - the form renderer owns that layout and exposes no hook to flex
+ * against it - so it is one number to adjust if the panels overflow or leave a gap.
+ */
+:root {
+  --syson-oc-panel-offset: 250px;
+}
+
+textarea[data-testid='input-Narrative (Markdown source)'] {
+  height: calc(100vh - var(--syson-oc-panel-offset)) !important;
+  min-height: 20rem !important;
+  max-height: none !important;
+  box-sizing: border-box;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+/* The rendered half, so collapsing the source gives the preview the same room. */
+[data-testid='Rendered'] {
+  height: calc(100vh - var(--syson-oc-panel-offset));
+  min-height: 20rem;
+  overflow-y: auto;
+}

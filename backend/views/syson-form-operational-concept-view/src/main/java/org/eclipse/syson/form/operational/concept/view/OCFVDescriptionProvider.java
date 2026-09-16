@@ -17,7 +17,7 @@ import org.eclipse.syson.common.view.api.IViewDescriptionProvider;
 import org.springframework.stereotype.Service;
 
 /**
- * Allows to register the Operational Concept View in the application.
+ * Allows to register the CONOPS Narrative View in the application.
  *
  * @author DTPrendergast
  */

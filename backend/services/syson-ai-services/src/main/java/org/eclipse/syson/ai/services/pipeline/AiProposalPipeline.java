@@ -76,6 +76,14 @@ public class AiProposalPipeline {
      * @return what happened, including why there is nothing to review when there is nothing
      */
     public GenerationOutcome run(String projectId, SerializedModelScope scope, String instruction, String author, IAiTask task) {
+        if (scope.elementCount() == 0) {
+            // Asking anyway wastes a paid call and, worse, invites an answer that is not an answer:
+            // a model told there is nothing to work from replies explaining that, and for a task
+            // whose candidates are prose rather than model elements there is nothing to tell that
+            // apart from a real one. It would then sit in the review list looking acceptable.
+            return this.nothingToReview("Nothing was in scope. Select the element to work from in the explorer - a document or a representation is not a model element.");
+        }
+
         var request = task.prompt(scope, instruction);
 
         GenerationResult generation = this.generationClient.generate(request);

@@ -69,7 +69,17 @@ import org.eclipse.syson.util.SysMLMetamodelHelper;
  */
 public class OCFVFormDescriptionProvider implements IRepresentationDescriptionProvider {
 
-    public static final String DESCRIPTION_NAME = "Operational Concept View";
+    /**
+     * Shown in the "Create a new representation" panel.
+     *
+     * <p>
+     * Renaming this is safe: a view description's identity comes from {@code EcoreUtil.getURI} -
+     * structural position within the view resource - and from {@code getViewId()}, neither of which
+     * involves this label. Existing representations keep working. Renaming {@code getViewId()}
+     * would not be safe, which is why it still says OperationalConceptView.
+     * </p>
+     */
+    public static final String DESCRIPTION_NAME = "CONOPS Narrative View";
 
     private final FormBuilders formBuilders = new FormBuilders();
 
@@ -104,7 +114,7 @@ public class OCFVFormDescriptionProvider implements IRepresentationDescriptionPr
         // whole panel in turn. Two groups would stack two separate toggles instead.
         GroupDescription narrativeGroup = this.formBuilders.newGroupDescription()
                 .name("OCFV-Group-Narrative")
-                .labelExpression("Operational concept")
+                .labelExpression("CONOPS narrative")
                 .displayMode(GroupDisplayMode.TOGGLEABLE_AREAS)
                 .semanticCandidatesExpression("aql:self")
                 .children(source, rendered)
@@ -125,7 +135,7 @@ public class OCFVFormDescriptionProvider implements IRepresentationDescriptionPr
                 // metadata rather than a type, so it cannot be expressed as a domain type and has
                 // to be a precondition.
                 .preconditionExpression("aql:self.isOperationalConcept()")
-                .titleExpression("aql:'Operational Concept'")
+                .titleExpression("aql:'CONOPS Narrative'")
                 .pages(page)
                 .build();
     }

@@ -99,16 +99,25 @@ const applyAiProposalItemMutation = gql`
  * that will be added if it is accepted, and it is added only when someone presses Accept. Rejecting
  * is purely local - it means "never apply this" - so a rejected candidate changes nothing.
  */
-export const SysONAiReviewDialog = ({ editingContextId, open, onClose }: SysONAiReviewDialogProps) => {
+export const SysONAiReviewDialog = ({
+  editingContextId,
+  open,
+  onClose,
+  elementId,
+  initialTask,
+  title,
+}: SysONAiReviewDialogProps) => {
   const { selection } = useSelection();
   const [instruction, setInstruction] = useState<string>('');
-  const [task, setTask] = useState<string>(AI_TASKS[0]!.kind);
+  const [task, setTask] = useState<string>(initialTask ?? AI_TASKS[0]!.kind);
   const [proposalId, setProposalId] = useState<string | null>(null);
   const [items, setItems] = useState<GQLProposedItem[]>([]);
   const [problems, setProblems] = useState<string[]>([]);
   const [decisions, setDecisions] = useState<Record<string, ItemDecision>>({});
 
-  const selectedIds: string[] = selection.entries.map((entry) => entry.id);
+  // An element handed in by a context menu wins over the explorer selection: the menu entry was
+  // opened on that element, so there is nothing to infer.
+  const selectedIds: string[] = elementId ? [elementId] : selection.entries.map((entry) => entry.id);
 
   // A generation costs real money and real time, so an unreviewed one is picked back up rather
   // than silently abandoned when the dialog is reopened or the page is refreshed.
@@ -197,7 +206,7 @@ export const SysONAiReviewDialog = ({ editingContextId, open, onClose }: SysONAi
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" data-testid="ai-review-dialog">
-      <DialogTitle>Ask the modeling assistant</DialogTitle>
+      <DialogTitle>{title ?? 'Ask the modeling assistant'}</DialogTitle>
       <DialogContent>
         <Stack spacing={2}>
           {proposalId !== null && !generating ? (
@@ -206,22 +215,26 @@ export const SysONAiReviewDialog = ({ editingContextId, open, onClose }: SysONAi
           <Typography variant="body2" color="textSecondary">
             {selectedIds.length === 0
               ? 'Select one or more elements in the explorer to work from.'
+              : elementId
+              ? 'Working from the element this menu was opened on.'
               : `Working from ${selectedIds.length} selected element(s).`}
           </Typography>
-          <TextField
-            select
-            label="Task"
-            value={task}
-            onChange={(event) => setTask(event.target.value)}
-            fullWidth
-            helperText={AI_TASKS.find((entry) => entry.kind === task)?.hint ?? ''}
-            data-testid="ai-task">
-            {AI_TASKS.map((entry) => (
-              <MenuItem key={entry.kind} value={entry.kind}>
-                {entry.label}
-              </MenuItem>
-            ))}
-          </TextField>
+          {initialTask ? null : (
+            <TextField
+              select
+              label="Task"
+              value={task}
+              onChange={(event) => setTask(event.target.value)}
+              fullWidth
+              helperText={AI_TASKS.find((entry) => entry.kind === task)?.hint ?? ''}
+              data-testid="ai-task">
+              {AI_TASKS.map((entry) => (
+                <MenuItem key={entry.kind} value={entry.kind}>
+                  {entry.label}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
           <TextField
             label="What should the assistant do?"
             value={instruction}

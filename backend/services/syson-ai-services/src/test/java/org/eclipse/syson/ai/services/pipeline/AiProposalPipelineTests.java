@@ -231,6 +231,21 @@ class AiProposalPipelineTests {
         verify(this.repository, never()).save(any());
     }
 
+    @Test
+    void refusesToAskWhenNothingIsInScope() {
+        var empty = new org.eclipse.syson.ai.services.scope.SerializedModelScope("", 0, false, List.of());
+
+        var outcome = this.pipeline.run("project-1", empty, "Turn my notes into prose.", "ai-assistant", this.derivedRequirements);
+
+        // No model call at all. A model told there is nothing to work from answers by saying so,
+        // and that answer was being stored as a reviewable candidate - for the narrative task,
+        // accepting it would have overwritten a real narrative with an apology.
+        verify(this.generationClient, never()).generate(any(GenerationRequest.class));
+        assertThat(outcome.hasSomethingToReview()).isFalse();
+        assertThat(outcome.problems().get(0)).contains("Nothing was in scope");
+        verify(this.repository, never()).save(any());
+    }
+
     private GenerationOutcome run() {
         // The scope is gathered the way the query handler gathers it, then handed over as text -
         // the pipeline never sees an EMF object.

@@ -989,6 +989,19 @@ items carrying provenance metadata.
 
 ## Cross-cutting
 
+**Renaming a view description's `name` orphans every representation already created from it.**
+Measured 2026-09-15 when "Operational Concept View" became "CONOPS Narrative View": the existing
+representation kept the same `sourceId` (the view resource) but the `sourceElementId` changed
+(`29097008-…` → `498f0391-…`), so its description resolved to null and opening it failed with
+*"The mapper … returned a null value"*. The id comes from
+`UUID.nameUUIDFromBytes(EcoreUtil.getURI(eObject))` in `IViewDescriptionProvider`, and the URI
+fragment is name-derived — **not** structural, as was assumed here before testing it. No content is
+lost, because a form representation holds none: the narrative lives on the model element, so a new
+representation over the same element shows the same text. But the old instance must be deleted and
+recreated. Renaming `getViewId()` would be worse still, since that also moves the view resource.
+
+
+
 **TODO (serious, affects every item): metadata annotations are not serialized, so nothing this
 fork stores as metadata survives export to textual SysML v2.** Measured 2026-09-14:
 
