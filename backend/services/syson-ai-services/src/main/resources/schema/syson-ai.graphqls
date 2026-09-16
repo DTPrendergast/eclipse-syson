@@ -5,6 +5,7 @@ extend type EditingContext {
 type AiProposal {
   id: String!
   taskKind: String!
+  seedElementIds: [String!]!
   prompt: String!
   modelId: String!
   createdBy: String!

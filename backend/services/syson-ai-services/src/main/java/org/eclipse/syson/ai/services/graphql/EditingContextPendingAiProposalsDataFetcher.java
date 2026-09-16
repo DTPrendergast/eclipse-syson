@@ -74,6 +74,6 @@ public class EditingContextPendingAiProposalsDataFetcher implements IDataFetcher
                 .toList();
 
         return new AiProposalView(proposal.getId().toString(), proposal.getTaskKind(), proposal.getPrompt(), proposal.getModelId(), proposal.getCreatedBy(),
-                proposal.getCreatedOn().toString(), items);
+                proposal.getCreatedOn().toString(), proposal.getSeedElementIds(), items);
     }
 }

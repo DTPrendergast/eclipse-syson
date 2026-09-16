@@ -60,6 +60,17 @@ public class AiProposal implements Persistable<UUID> {
 
     private String createdBy;
 
+    /**
+     * The elements the generation was run from, comma separated.
+     *
+     * <p>
+     * Kept so that resuming an unreviewed proposal can be scoped to the element the reviewer
+     * actually has open. Candidates derived from one element applied to another would be wrong in
+     * every task and destructive in the one that replaces a narrative.
+     * </p>
+     */
+    private String seedElementIds = "";
+
     @MappedCollection(idColumn = "ai_proposal_id", keyColumn = "item_index")
     private List<AiProposalItem> items = new ArrayList<>();
 
@@ -88,16 +99,19 @@ public class AiProposal implements Persistable<UUID> {
      *            the model that generated it, kept as provenance
      * @param createdBy
      *            who requested it, kept as provenance
+     * @param seedElementIds
+     *            the elements the generation was run from
      * @param items
      *            the candidates offered for review
      */
-    public AiProposal(String projectId, String taskKind, String prompt, String modelId, String createdBy, List<AiProposalItem> items) {
+    public AiProposal(String projectId, String taskKind, String prompt, String modelId, String createdBy, List<String> seedElementIds, List<AiProposalItem> items) {
         this.id = UUID.randomUUID();
         this.projectId = Objects.requireNonNull(projectId);
         this.taskKind = Objects.requireNonNull(taskKind);
         this.prompt = Objects.requireNonNull(prompt);
         this.modelId = Objects.requireNonNull(modelId);
         this.createdBy = Objects.requireNonNull(createdBy);
+        this.seedElementIds = String.join(",", Objects.requireNonNull(seedElementIds));
         this.items = new ArrayList<>(Objects.requireNonNull(items));
         this.status = AiProposalStatus.PENDING_REVIEW;
         this.createdOn = Instant.now();
@@ -137,6 +151,19 @@ public class AiProposal implements Persistable<UUID> {
 
     public String getCreatedBy() {
         return this.createdBy;
+    }
+
+    /**
+     * The elements this proposal was generated from.
+     *
+     * @return the seed element identifiers, empty for proposals created before they were recorded
+     */
+    public List<String> getSeedElementIds() {
+        List<String> ids = List.of();
+        if (this.seedElementIds != null && !this.seedElementIds.isBlank()) {
+            ids = List.of(this.seedElementIds.split(","));
+        }
+        return ids;
     }
 
     public List<AiProposalItem> getItems() {

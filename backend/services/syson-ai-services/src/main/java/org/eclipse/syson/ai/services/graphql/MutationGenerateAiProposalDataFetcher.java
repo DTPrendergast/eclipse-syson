@@ -128,7 +128,7 @@ public class MutationGenerateAiProposalDataFetcher implements IDataFetcherWithFi
                     List.of("Unknown assistant task '" + input.task() + "'. Known tasks: " + String.join(", ", this.taskRegistry.kinds()) + "."));
         }
 
-        var outcome = this.pipeline.run(input.editingContextId(), scope, input.instruction(), AI_ASSISTANT_AUTHOR, optionalTask.get());
+        var outcome = this.pipeline.run(input.editingContextId(), scope, input.elementIds(), input.instruction(), AI_ASSISTANT_AUTHOR, optionalTask.get());
         String proposalId = null;
         if (outcome.proposal().isPresent()) {
             proposalId = outcome.proposal().get().toString();

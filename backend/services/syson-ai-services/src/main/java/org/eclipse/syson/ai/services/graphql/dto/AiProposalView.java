@@ -34,14 +34,18 @@ import java.util.List;
  *            the origin of the content
  * @param createdOn
  *            when it was generated, ISO-8601
+ * @param seedElementIds
+ *            the elements it was generated from, so a resumed review can be scoped to them
  * @param items
  *            the candidates and where each has got to
  *
  * @author DTPrendergast
  */
-public record AiProposalView(String id, String taskKind, String prompt, String modelId, String createdBy, String createdOn, List<AiProposalItemView> items) {
+public record AiProposalView(String id, String taskKind, String prompt, String modelId, String createdBy, String createdOn, List<String> seedElementIds,
+        List<AiProposalItemView> items) {
 
     public AiProposalView {
+        seedElementIds = List.copyOf(seedElementIds);
         items = List.copyOf(items);
     }
 }

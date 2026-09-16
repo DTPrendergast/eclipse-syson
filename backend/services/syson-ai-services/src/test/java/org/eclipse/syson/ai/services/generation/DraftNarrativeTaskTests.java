@@ -148,14 +148,18 @@ class DraftNarrativeTaskTests {
         var request = this.task.prompt(scope, "Turn my notes into prose.");
 
         assertThat(request.userPrompt()).contains("dispatcher triages");
-        assertThat(request.systemPrompt()).contains("Keep every point they made");
+        assertThat(request.systemPrompt()).contains("Carry over every point");
+        // The first draft of this prompt produced one sentence per bullet and nothing else, because
+        // it said "rewriting, not deciding what matters" and offered leaving bullets as an out.
+        assertThat(request.systemPrompt()).contains("Group related points into paragraphs");
+        assertThat(request.systemPrompt()).contains("Follow any length or structure the engineer asks for");
         // The heading rule earned its place: the first narrative written in this project used
         // "#Introduction" with no space, which is not a heading in any Markdown dialect.
         assertThat(request.systemPrompt()).contains("needs a space after the hashes");
     }
 
     private AiProposal proposalWith(String prose) {
-        return new AiProposal("project-1", DraftNarrativeTask.KIND, "turn notes into prose", "claude-opus-5", "ai-assistant",
+        return new AiProposal("project-1", DraftNarrativeTask.KIND, "turn notes into prose", "claude-opus-5", "ai-assistant", List.of("seed-1"),
                 List.of(new AiProposalItem("Rewritten narrative", prose)));
     }
 

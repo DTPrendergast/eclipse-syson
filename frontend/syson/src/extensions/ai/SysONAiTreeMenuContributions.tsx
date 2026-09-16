@@ -10,40 +10,62 @@
  * Contributors:
  *     Obeo - initial API and implementation
  *******************************************************************************/
-import { TreeItemContextMenuComponentProps } from '@eclipse-sirius/sirius-components-trees';
+import { fuzzyMatch, PaletteToolOverriddenContributionComponentProps } from '@eclipse-sirius/sirius-components-palette';
+import { TreePaletteContext, TreePaletteContextValue } from '@eclipse-sirius/sirius-components-trees';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import MenuItem from '@mui/material/MenuItem';
-import React, { forwardRef, Fragment, useState } from 'react';
+import React, { forwardRef, Fragment, useContext, useState } from 'react';
 import { SysONAiReviewDialog } from './SysONAiReviewDialog';
 
 /**
- * Builds a context-menu entry that runs one assistant task on the element the menu was opened on.
+ * Builds the explorer palette entry that runs one assistant task on the element it was opened on.
  *
- * The element comes from the tree item rather than from the explorer selection, which is the whole
- * reason these entries exist: reached from the project menu, the assistant worked on whatever was
- * selected, and a selection can be a document or a representation rather than a model element.
+ * Registered against `paletteToolOverrideExtensionPoint`, not
+ * `treeItemContextMenuEntryOverrideExtensionPoint`. Both exist and SysON registers its own entries
+ * on both, but the explorer's menu is rendered by `PaletteToolSection`, which consults only the
+ * palette one. Registering on the other produced an entry that drew with its server-provided label
+ * and did nothing when clicked, because with no override the default row asks the backend to invoke
+ * a tool that does not exist.
+ *
+ * The element comes from `TreePaletteContext`, so the task runs on the tree item the menu belongs
+ * to rather than on whatever happens to be selected in the explorer.
  */
-export const aiTaskMenuContribution = (task: string, label: string, dialogTitle: string) =>
+export const aiTaskPaletteContribution = (task: string, dialogTitle: string) =>
   forwardRef(
     (
-      { editingContextId, treeId, item, readOnly, onClose }: TreeItemContextMenuComponentProps,
+      { onInvoked, searchedValue, tool }: PaletteToolOverriddenContributionComponentProps,
       ref: React.ForwardedRef<HTMLLIElement>
     ) => {
+      const { editingContextId, item, treeId, readOnly, onClose } =
+        useContext<TreePaletteContextValue>(TreePaletteContext);
       const [open, setOpen] = useState<boolean>(false);
 
       if (!treeId.startsWith('explorer://') || readOnly) {
         return null;
       }
 
+      const matchResult = searchedValue ? fuzzyMatch(tool.label, searchedValue) : null;
+      if (!!searchedValue && !matchResult?.matches) {
+        return null;
+      }
+
       return (
         <Fragment key={`ai-task-${task}`}>
-          <MenuItem onClick={() => setOpen(true)} data-testid={`ai-task-${task}`} ref={ref} aria-label={label}>
+          <MenuItem
+            key={`ai-task-menu-${task}`}
+            onClick={() => {
+              onInvoked();
+              setOpen(true);
+            }}
+            data-testid={`ai-task-${task}`}
+            ref={ref}
+            aria-label={tool.label}>
             <ListItemIcon>
               <AutoAwesomeIcon fontSize="small" />
             </ListItemIcon>
-            <ListItemText primary={label} />
+            <ListItemText primary={tool.label} />
           </MenuItem>
           {open ? (
             <SysONAiReviewDialog
@@ -63,14 +85,12 @@ export const aiTaskMenuContribution = (task: string, label: string, dialogTitle:
     }
   );
 
-export const AiDraftNarrativeMenuContribution = aiTaskMenuContribution(
+export const AiDraftNarrativePaletteContribution = aiTaskPaletteContribution(
   'draft-narrative',
-  'Draft the narrative as prose',
   'Draft the narrative as prose'
 );
 
-export const AiDraftUseCasesMenuContribution = aiTaskMenuContribution(
+export const AiDraftUseCasesPaletteContribution = aiTaskPaletteContribution(
   'draft-use-cases',
-  'Draft use cases',
   'Draft use cases from this operational concept'
 );

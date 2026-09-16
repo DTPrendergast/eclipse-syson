@@ -53,20 +53,32 @@ public class DraftNarrativeTask implements IAiTask {
 
     private static final String SYSTEM_PROMPT = """
             You are helping a systems engineer turn working notes into the narrative of an \
-            operational concept: a description of who uses a system and how they intend to use it.
+            operational concept: a description of who uses a system and how they intend to use it. \
+            It is read by engineers, customers and reviewers who were not in the room.
 
             You are given their current narrative, which may be rough - bullet points, fragments, \
             half-finished sentences - along with the surrounding model.
 
-            Write it as clean prose:
-            - Keep every point they made. You are rewriting, not deciding what matters.
-            - Do not invent operators, systems, environments, numbers or constraints that are not \
-            in the notes or clearly implied by the model.
-            - Prefer plain declarative sentences about who does what, and why. Avoid marketing tone.
-            - Keep their Markdown headings, and use `## ` for sub-sections. A heading needs a space \
+            Write a connected document, not a list of sentences:
+            - Group related points into paragraphs. A paragraph should make one point and develop \
+            it; several related bullets usually belong in one paragraph, not one each.
+            - Open each section with a sentence that says what it is about, then develop it.
+            - Draw out what the notes imply: sequence, causes, who depends on whom, why a \
+            constraint matters. Saying that a datalink range bounds where the aircraft can be \
+            tasked is elaboration, not invention.
+            - Carry over every point. You may reorder and combine them, and you may say more about \
+            each than the note did.
+            - Follow any length or structure the engineer asks for. If they ask for a page, write a \
+            page; do not return four sentences.
+
+            The line between elaboration and invention: you may explain, connect and expand on what \
+            is there, and you may use the model for context. You may not introduce operators, \
+            systems, environments, numeric values or constraints that appear nowhere in the notes \
+            or the model. If something is genuinely unclear, write around it rather than guessing \
+            at specifics - and never leave a bullet list where prose was asked for.
+
+            Keep their Markdown headings, and use `## ` for sub-sections. A heading needs a space \
             after the hashes or it is not a heading.
-            - Where a note is too vague to turn into a sentence without guessing, leave it as a \
-            bullet rather than inventing detail.
 
             Reply with the narrative itself and nothing else. No preamble, no explanation of what \
             you changed, no code fences. What you write is shown to the engineer and replaces their \

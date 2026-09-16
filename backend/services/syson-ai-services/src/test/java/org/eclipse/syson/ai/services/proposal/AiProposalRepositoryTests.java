@@ -76,7 +76,7 @@ class AiProposalRepositoryTests {
 
     @Test
     void persistsAProposalWithItsItems() {
-        var proposal = new AiProposal("project-1", TASK_KIND, "Derive requirements for the power subsystem", MODEL_ID, AUTHOR,
+        var proposal = new AiProposal("project-1", TASK_KIND, "Derive requirements for the power subsystem", MODEL_ID, AUTHOR, List.of("seed-1"),
                 List.of(new AiProposalItem("REQ-010", "requirement req10 : R1;"), new AiProposalItem("REQ-011", "requirement req11 : R1;")));
 
         this.proposalRepository.save(proposal);
@@ -95,7 +95,7 @@ class AiProposalRepositoryTests {
 
     @Test
     void keepsPerItemDecisionsAndDerivesTheProposalStatus() {
-        var proposal = new AiProposal("project-2", TASK_KIND, "Derive requirements", MODEL_ID, AUTHOR,
+        var proposal = new AiProposal("project-2", TASK_KIND, "Derive requirements", MODEL_ID, AUTHOR, List.of("seed-1"),
                 List.of(new AiProposalItem("kept", "requirement kept : R1;"), new AiProposalItem("dropped", "requirement dropped : R1;")));
         this.proposalRepository.save(proposal);
 
@@ -115,7 +115,7 @@ class AiProposalRepositoryTests {
 
     @Test
     void rejectingEveryItemLeavesNothingApplied() {
-        var proposal = new AiProposal("project-3", TASK_KIND, "Derive requirements", MODEL_ID, AUTHOR,
+        var proposal = new AiProposal("project-3", TASK_KIND, "Derive requirements", MODEL_ID, AUTHOR, List.of("seed-1"),
                 List.of(new AiProposalItem("dropped", "requirement dropped : R1;")));
         this.proposalRepository.save(proposal);
 
@@ -129,9 +129,9 @@ class AiProposalRepositoryTests {
 
     @Test
     void findsTheProposalsOfAProjectNewestFirst() {
-        var older = new AiProposal("project-4", TASK_KIND, "first", MODEL_ID, AUTHOR, List.of());
+        var older = new AiProposal("project-4", TASK_KIND, "first", MODEL_ID, AUTHOR, List.of("seed-1"), List.of());
         this.proposalRepository.save(older);
-        var newer = new AiProposal("project-4", TASK_KIND, "second", MODEL_ID, AUTHOR, List.of());
+        var newer = new AiProposal("project-4", TASK_KIND, "second", MODEL_ID, AUTHOR, List.of("seed-1"), List.of());
         this.proposalRepository.save(newer);
 
         var found = this.proposalRepository.findAllByProjectIdOrderByCreatedOnDesc("project-4");

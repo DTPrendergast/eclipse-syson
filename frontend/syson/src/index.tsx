@@ -21,10 +21,11 @@ import {
   SiriusWebApplication,
 } from '@eclipse-sirius/sirius-web-application';
 import {
-  GQLTreeItemContextMenuEntry,
-  treeItemContextMenuEntryOverrideExtensionPoint,
-  TreeItemContextMenuOverrideContribution,
-} from '@eclipse-sirius/sirius-components-trees';
+  GQLTool,
+  PaletteToolOverriddenContributionProps,
+  paletteToolOverrideExtensionPoint,
+} from '@eclipse-sirius/sirius-components-palette';
+import { TREE_REPRESENTATION_KIND } from '@eclipse-sirius/sirius-components-trees';
 import {
   sysONExtensionRegistry,
   SysONExtensionRegistryMergeStrategy,
@@ -35,8 +36,8 @@ import { createRoot } from 'react-dom/client';
 import { httpOrigin, wsOrigin } from './core/URL';
 import { SysONAiAssistantMenuEntry } from './extensions/ai/SysONAiAssistantMenuEntry';
 import {
-  AiDraftNarrativeMenuContribution,
-  AiDraftUseCasesMenuContribution,
+  AiDraftNarrativePaletteContribution,
+  AiDraftUseCasesPaletteContribution,
 } from './extensions/ai/SysONAiTreeMenuContributions';
 import { SysONFooter } from './extensions/SysONFooter';
 import { SysONNavigationBarIcon } from './extensions/SysONNavigationBarIcon';
@@ -76,36 +77,39 @@ sysONExtensionRegistry.addComponent(editProjectNavbarMenuEntryExtensionPoint, {
 
 /*
  * The assistant's tasks appear on the context menu of the element they apply to, which is what
- * makes them unambiguous: the entry knows which element it was opened on, where the project menu
+ * makes them unambiguous: the entry knows which tree item it was opened on, where the project menu
  * could only read the explorer selection - and a selection can be a document or a representation
  * rather than a model element.
  *
- * Appended to SysON's own contributions rather than registered separately: the registry keeps one
- * data extension per extension point, so a second putData would replace SysON's entries and take
- * "New objects from text" and the expression entries with it.
+ * Registered on paletteToolOverrideExtensionPoint. SysON registers its own explorer entries on both
+ * this and treeItemContextMenuEntryOverrideExtensionPoint, but only this one is consulted by
+ * PaletteToolSection, which is what actually renders the explorer menu. Registering on the other
+ * alone produced entries that appeared and did nothing.
+ *
+ * Appended to SysON's contributions rather than registered separately: the registry keeps one data
+ * extension per extension point, so a second putData would replace them and take "New objects from
+ * text" and the expression entries with it.
  */
-const existingTreeItemContributions =
-  sysONExtensionRegistry.getData<TreeItemContextMenuOverrideContribution[]>(
-    treeItemContextMenuEntryOverrideExtensionPoint
-  )?.data ?? [];
+const existingPaletteContributions =
+  sysONExtensionRegistry.getData<PaletteToolOverriddenContributionProps[]>(paletteToolOverrideExtensionPoint)?.data ??
+  [];
 
-sysONExtensionRegistry.putData<TreeItemContextMenuOverrideContribution[]>(
-  treeItemContextMenuEntryOverrideExtensionPoint,
-  {
-    identifier: `syson_${treeItemContextMenuEntryOverrideExtensionPoint.identifier}`,
-    data: [
-      ...existingTreeItemContributions,
-      {
-        canHandle: (entry: GQLTreeItemContextMenuEntry) => entry.id === 'aiDraftNarrative',
-        component: AiDraftNarrativeMenuContribution,
-      },
-      {
-        canHandle: (entry: GQLTreeItemContextMenuEntry) => entry.id === 'aiDraftUseCases',
-        component: AiDraftUseCasesMenuContribution,
-      },
-    ],
-  }
-);
+sysONExtensionRegistry.putData<PaletteToolOverriddenContributionProps[]>(paletteToolOverrideExtensionPoint, {
+  identifier: `syson_${paletteToolOverrideExtensionPoint.identifier}`,
+  data: [
+    ...existingPaletteContributions,
+    {
+      canHandle: (representationDescriptionId: string, tool: GQLTool) =>
+        representationDescriptionId === TREE_REPRESENTATION_KIND && tool.id === 'aiDraftNarrative',
+      component: AiDraftNarrativePaletteContribution,
+    },
+    {
+      canHandle: (representationDescriptionId: string, tool: GQLTool) =>
+        representationDescriptionId === TREE_REPRESENTATION_KIND && tool.id === 'aiDraftUseCases',
+      component: AiDraftUseCasesPaletteContribution,
+    },
+  ],
+});
 
 const container = document.getElementById('root');
 const root = createRoot(container!);

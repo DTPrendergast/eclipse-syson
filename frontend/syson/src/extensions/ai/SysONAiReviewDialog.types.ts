@@ -85,6 +85,7 @@ export interface GQLAiProposalItem {
 export interface GQLAiProposal {
   id: string;
   taskKind: string;
+  seedElementIds: string[];
   prompt: string;
   modelId: string;
   createdBy: string;

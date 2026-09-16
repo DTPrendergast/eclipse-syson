@@ -67,6 +67,8 @@ const pendingAiProposalsQuery = gql`
       editingContext(editingContextId: $editingContextId) {
         pendingAiProposals {
           id
+          taskKind
+          seedElementIds
           prompt
           createdOn
           items {
@@ -132,7 +134,19 @@ export const SysONAiReviewDialog = ({
     if (!open || proposalId !== null || pendingProposals.length === 0) {
       return;
     }
-    const mostRecent = pendingProposals[0]!;
+    // Only resume a proposal that was produced by the task in front of the user, from the element
+    // in front of them. Without both checks the dialog resurrected any unreviewed proposal in the
+    // project - so a ten-day-old use-case run reappeared under a narrative request, and accepting
+    // one of its candidates would have applied it to the wrong element.
+    const resumable = pendingProposals.filter(
+      (proposal) =>
+        proposal.taskKind === task &&
+        (selectedIds.length === 0 || selectedIds.every((id) => proposal.seedElementIds.includes(id)))
+    );
+    if (resumable.length === 0) {
+      return;
+    }
+    const mostRecent = resumable[0]!;
     setProposalId(mostRecent.id);
     setItems(mostRecent.items.map((item) => ({ id: item.id, label: item.label, sysmlFragment: item.sysmlFragment })));
     setDecisions(
@@ -140,8 +154,9 @@ export const SysONAiReviewDialog = ({
         mostRecent.items.map((item) => [item.id, item.status === 'APPLIED' ? 'applied' : 'pending'] as const)
       )
     );
-    setInstruction(mostRecent.prompt);
-  }, [open, proposalId, pendingProposals]);
+    // Only prefill an empty box; never overwrite what the user is in the middle of typing.
+    setInstruction((current) => (current.trim().length === 0 ? mostRecent.prompt : current));
+  }, [open, proposalId, pendingProposals, task, selectedIds]);
 
   const [generate, { loading: generating }] = useMutation<GQLGenerateAiProposalData, GQLGenerateAiProposalVariables>(
     generateAiProposalMutation

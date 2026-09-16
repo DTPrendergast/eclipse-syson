@@ -211,7 +211,7 @@ class AiProposalPipelineTests {
         var policy = ModelScopePolicy.defaultPolicy();
         var scope = new ModelScopeSerializer().serialize(new ModelScopeSelector().select(List.of(seed), policy), policy);
 
-        var outcome = this.pipeline.run("project-1", scope, "Draft use cases.", "ai-assistant", this.draftUseCases);
+        var outcome = this.pipeline.run("project-1", scope, List.of("seed-1"), "Draft use cases.", "ai-assistant", this.draftUseCases);
 
         assertThat(outcome.hasSomethingToReview()).isTrue();
         assertThat(outcome.items()).extracting(ProposedItem::label).containsExactly("restorePower");
@@ -235,7 +235,7 @@ class AiProposalPipelineTests {
     void refusesToAskWhenNothingIsInScope() {
         var empty = new org.eclipse.syson.ai.services.scope.SerializedModelScope("", 0, false, List.of());
 
-        var outcome = this.pipeline.run("project-1", empty, "Turn my notes into prose.", "ai-assistant", this.derivedRequirements);
+        var outcome = this.pipeline.run("project-1", empty, List.of(), "Turn my notes into prose.", "ai-assistant", this.derivedRequirements);
 
         // No model call at all. A model told there is nothing to work from answers by saying so,
         // and that answer was being stored as a reviewable candidate - for the narrative task,
@@ -246,13 +246,26 @@ class AiProposalPipelineTests {
         verify(this.repository, never()).save(any());
     }
 
+    @Test
+    void recordsWhichElementsItWasGeneratedFrom() {
+        this.stubGeneration(TWO_GOOD_REQUIREMENTS);
+        when(this.repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        this.run();
+
+        // Resuming an unreviewed proposal has to be scoped to the element the reviewer has open:
+        // candidates derived from one element applied to another are wrong for every task, and
+        // destructive for the one that replaces a narrative.
+        assertThat(this.captureSaved().getSeedElementIds()).containsExactly("seed-1");
+    }
+
     private GenerationOutcome run() {
         // The scope is gathered the way the query handler gathers it, then handed over as text -
         // the pipeline never sees an EMF object.
         Element seed = this.find("enduranceRequirement");
         var policy = ModelScopePolicy.defaultPolicy();
         var scope = new ModelScopeSerializer().serialize(new ModelScopeSelector().select(List.of(seed), policy), policy);
-        return this.pipeline.run("project-1", scope, "Derive cell-level requirements for the battery.", "ai-assistant", this.derivedRequirements);
+        return this.pipeline.run("project-1", scope, List.of("seed-1"), "Derive cell-level requirements for the battery.", "ai-assistant", this.derivedRequirements);
     }
 
     private void stubGeneration(String responseText) {

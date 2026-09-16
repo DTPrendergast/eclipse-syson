@@ -83,8 +83,11 @@ public class AiAssistantTreeItemPaletteCustomizer implements ITreeItemPaletteCus
     @Override
     public Palette customize(IEditingContext editingContext, TreeDescription treeDescription, Tree tree, TreeItem treeItem, Palette palette) {
         List<IPaletteEntry> entries = new ArrayList<>(palette.paletteEntries());
-        entries.add(new SingleClickTreeItemTool(DRAFT_NARRATIVE_ENTRY_ID, "", List.of(), false, List.of()));
-        entries.add(new SingleClickTreeItemTool(DRAFT_USE_CASES_ENTRY_ID, "", List.of(), false, List.of()));
+        entries.add(new SingleClickTreeItemTool(DRAFT_NARRATIVE_ENTRY_ID, "Draft the narrative as prose", List.of(), false, List.of()));
+        entries.add(new SingleClickTreeItemTool(DRAFT_USE_CASES_ENTRY_ID, "Draft use cases", List.of(), false, List.of()));
+        // Labels are set here rather than left to the frontend contribution. SysON's own entries
+        // pass "" and rely on their override component to draw the row, which means an entry whose
+        // override does not match renders as a blank line - present, clickable and invisible.
         return new Palette(palette.id(), palette.quickAccessTools(), entries);
     }
 

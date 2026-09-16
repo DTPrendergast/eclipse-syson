@@ -67,6 +67,9 @@ public class AiProposalPipeline {
      * @param scope
      *            the model context, already gathered and serialized on the editing context's own
      *            thread by the caller
+     * @param seedElementIds
+     *            the elements the scope was gathered from, recorded so that resuming this proposal
+     *            later can be scoped to the same elements
      * @param instruction
      *            what the engineer asked for
      * @param author
@@ -75,7 +78,7 @@ public class AiProposalPipeline {
      *            which task to run; supplies the prompt and the kind every candidate must be
      * @return what happened, including why there is nothing to review when there is nothing
      */
-    public GenerationOutcome run(String projectId, SerializedModelScope scope, String instruction, String author, IAiTask task) {
+    public GenerationOutcome run(String projectId, SerializedModelScope scope, List<String> seedElementIds, String instruction, String author, IAiTask task) {
         if (scope.elementCount() == 0) {
             // Asking anyway wastes a paid call and, worse, invites an answer that is not an answer:
             // a model told there is nothing to work from replies explaining that, and for a task
@@ -89,7 +92,7 @@ public class AiProposalPipeline {
         GenerationResult generation = this.generationClient.generate(request);
         GenerationOutcome outcome;
         if (generation.isUsable()) {
-            outcome = this.review(projectId, instruction, author, generation, task);
+            outcome = this.review(projectId, seedElementIds, instruction, author, generation, task);
         } else {
             outcome = this.nothingToReview(generation.explanationIfAny().orElse("Generation did not produce an answer: " + generation.outcome() + "."));
         }
@@ -99,7 +102,7 @@ public class AiProposalPipeline {
     /**
      * Validates what came back and, if it holds up, stores it for review.
      */
-    private GenerationOutcome review(String projectId, String instruction, String author, GenerationResult generation, IAiTask task) {
+    private GenerationOutcome review(String projectId, List<String> seedElementIds, String instruction, String author, GenerationResult generation, IAiTask task) {
         // The task decides what a usable answer looks like: parsing and a type check for model
         // elements, something else entirely for prose.
         ValidationResult validation = task.validate(generation.text());
@@ -116,7 +119,7 @@ public class AiProposalPipeline {
             for (var candidate : validation.candidates()) {
                 items.add(new AiProposalItem(candidate.label(), candidate.sysmlFragment()));
             }
-            var proposal = new AiProposal(projectId, task.kind(), instruction, generation.modelId(), author, items);
+            var proposal = new AiProposal(projectId, task.kind(), instruction, generation.modelId(), author, seedElementIds, items);
             var saved = this.proposalRepository.save(proposal);
             var proposed = saved.getItems().stream()
                     .map(item -> new ProposedItem(item.getId().toString(), item.getLabel(), item.getSysmlFragment()))
