@@ -15,6 +15,7 @@ package org.eclipse.syson.ai.services.graphql;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.eclipse.sirius.components.collaborative.api.ChangeDescription;
 import org.eclipse.sirius.components.collaborative.api.IEditingContextEventHandler;
@@ -22,6 +23,7 @@ import org.eclipse.sirius.components.core.api.IEditingContext;
 import org.eclipse.sirius.components.core.api.IInput;
 import org.eclipse.sirius.components.core.api.IObjectSearchService;
 import org.eclipse.sirius.components.core.api.IPayload;
+import org.eclipse.sirius.web.domain.boundedcontexts.representationdata.RepresentationMetadata;
 import org.eclipse.syson.ai.services.graphql.dto.GatherModelScopeInput;
 import org.eclipse.syson.ai.services.graphql.dto.GatherModelScopePayload;
 import org.eclipse.syson.ai.services.scope.ModelScopePolicy;
@@ -71,14 +73,32 @@ public class GatherModelScopeEventHandler implements IEditingContextEventHandler
 
         if (input instanceof GatherModelScopeInput scopeInput) {
             for (String elementId : scopeInput.elementIds()) {
-                this.objectSearchService.getObject(editingContext, elementId)
-                        .filter(Element.class::isInstance)
-                        .map(Element.class::cast)
-                        .ifPresent(seeds::add);
+                this.resolveElement(editingContext, elementId).ifPresent(seeds::add);
             }
         }
 
         var scope = this.selector.select(List.copyOf(seeds), policy);
         payloadSink.tryEmitValue(new GatherModelScopePayload(input.id(), this.serializer.serialize(scope, policy)));
+    }
+
+    /**
+     * The model element an identifier refers to, following a representation to what it is a
+     * representation of.
+     *
+     * <p>
+     * An assistant entry opened on a representation - the CONOPS Narrative View, say - hands over
+     * that representation's id, and a representation is not a model element. Resolving it here
+     * rather than in the caller means every entry point can pass whatever the tree gave it.
+     * </p>
+     */
+    private Optional<Element> resolveElement(IEditingContext editingContext, String identifier) {
+        Optional<Object> object = this.objectSearchService.getObject(editingContext, identifier);
+
+        if (object.filter(RepresentationMetadata.class::isInstance).isPresent()) {
+            object = object.map(RepresentationMetadata.class::cast)
+                    .flatMap(metadata -> this.objectSearchService.getObject(editingContext, metadata.getTargetObjectId()));
+        }
+
+        return object.filter(Element.class::isInstance).map(Element.class::cast);
     }
 }

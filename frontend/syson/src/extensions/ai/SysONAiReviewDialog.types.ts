@@ -128,8 +128,13 @@ export const AI_TASKS: AiTaskOption[] = [
   },
   {
     kind: 'draft-narrative',
-    label: 'Draft the narrative as prose',
+    label: 'Narrative AI Assistant',
     hint: 'Rewrites an operational concept narrative from notes into prose. Accepting REPLACES the current narrative.',
+  },
+  {
+    kind: 'detail-use-case',
+    label: 'Use Case AI Assistant',
+    hint: "Fills in one use case's details: actor, trigger, flow and outcome. Accepting REPLACES that use case's documentation.",
   },
 ];
 

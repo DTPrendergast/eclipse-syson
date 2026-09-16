@@ -85,12 +85,14 @@ export const aiTaskPaletteContribution = (task: string, dialogTitle: string) =>
     }
   );
 
-export const AiDraftNarrativePaletteContribution = aiTaskPaletteContribution(
+/** On a representation of an operational concept; rewrites that concept's narrative. */
+export const AiNarrativeAssistantPaletteContribution = aiTaskPaletteContribution(
   'draft-narrative',
-  'Draft the narrative as prose'
+  'Narrative AI Assistant'
 );
 
-export const AiDraftUseCasesPaletteContribution = aiTaskPaletteContribution(
-  'draft-use-cases',
-  'Draft use cases from this operational concept'
+/** On an individual use case; fills in that use case's details. */
+export const AiUseCaseAssistantPaletteContribution = aiTaskPaletteContribution(
+  'detail-use-case',
+  'Use Case AI Assistant'
 );

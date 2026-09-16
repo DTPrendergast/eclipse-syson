@@ -118,7 +118,7 @@ public class DraftNarrativeTask implements IAiTask {
         if (rawResponse != null) {
             text = rawResponse;
         }
-        String stripped = this.stripCodeFences(text);
+        String stripped = this.prompts.stripCodeFences(text);
         boolean fencesStripped = !stripped.equals(text.strip());
 
         List<GeneratedCandidate> candidates = List.of();
@@ -148,19 +148,4 @@ public class DraftNarrativeTask implements IAiTask {
         return written;
     }
 
-    private String stripCodeFences(String text) {
-        String result = text.strip();
-        if (result.startsWith("```")) {
-            int firstLineEnd = result.indexOf('\n');
-            if (firstLineEnd >= 0) {
-                result = result.substring(firstLineEnd + 1);
-            }
-            if (result.stripTrailing().endsWith("```")) {
-                result = result.stripTrailing();
-                result = result.substring(0, result.length() - 3);
-            }
-            result = result.strip();
-        }
-        return result;
-    }
 }

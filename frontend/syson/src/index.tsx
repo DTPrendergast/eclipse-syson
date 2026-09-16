@@ -36,8 +36,8 @@ import { createRoot } from 'react-dom/client';
 import { httpOrigin, wsOrigin } from './core/URL';
 import { SysONAiAssistantMenuEntry } from './extensions/ai/SysONAiAssistantMenuEntry';
 import {
-  AiDraftNarrativePaletteContribution,
-  AiDraftUseCasesPaletteContribution,
+  AiNarrativeAssistantPaletteContribution,
+  AiUseCaseAssistantPaletteContribution,
 } from './extensions/ai/SysONAiTreeMenuContributions';
 import { SysONFooter } from './extensions/SysONFooter';
 import { SysONNavigationBarIcon } from './extensions/SysONNavigationBarIcon';
@@ -100,13 +100,13 @@ sysONExtensionRegistry.putData<PaletteToolOverriddenContributionProps[]>(palette
     ...existingPaletteContributions,
     {
       canHandle: (representationDescriptionId: string, tool: GQLTool) =>
-        representationDescriptionId === TREE_REPRESENTATION_KIND && tool.id === 'aiDraftNarrative',
-      component: AiDraftNarrativePaletteContribution,
+        representationDescriptionId === TREE_REPRESENTATION_KIND && tool.id === 'aiNarrativeAssistant',
+      component: AiNarrativeAssistantPaletteContribution,
     },
     {
       canHandle: (representationDescriptionId: string, tool: GQLTool) =>
-        representationDescriptionId === TREE_REPRESENTATION_KIND && tool.id === 'aiDraftUseCases',
-      component: AiDraftUseCasesPaletteContribution,
+        representationDescriptionId === TREE_REPRESENTATION_KIND && tool.id === 'aiUseCaseAssistant',
+      component: AiUseCaseAssistantPaletteContribution,
     },
   ],
 });

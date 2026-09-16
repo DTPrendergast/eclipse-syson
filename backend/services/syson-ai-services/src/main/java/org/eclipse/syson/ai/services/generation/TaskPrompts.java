@@ -51,6 +51,34 @@ public class TaskPrompts {
             """;
 
     /**
+     * Removes Markdown code fences from a response.
+     *
+     * <p>
+     * Shared by the prose tasks, whose answers are not parsed and so have no other chance to lose
+     * a fence the model added despite being told not to.
+     * </p>
+     *
+     * @param text
+     *            the raw response
+     * @return the response without surrounding fences
+     */
+    public String stripCodeFences(String text) {
+        String result = text.strip();
+        if (result.startsWith("```")) {
+            int firstLineEnd = result.indexOf('\n');
+            if (firstLineEnd >= 0) {
+                result = result.substring(firstLineEnd + 1);
+            }
+            if (result.stripTrailing().endsWith("```")) {
+                result = result.stripTrailing();
+                result = result.substring(0, result.length() - 3);
+            }
+            result = result.strip();
+        }
+        return result;
+    }
+
+    /**
      * Wraps the engineer's instruction and the model context in the shape every task uses.
      *
      * @param scope
