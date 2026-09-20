@@ -26,10 +26,13 @@ import org.eclipse.syson.application.services.SysONResourceService;
 import org.eclipse.syson.services.api.ISysONResourceService;
 import org.eclipse.syson.sysml.ActionUsage;
 import org.eclipse.syson.sysml.Membership;
+import org.eclipse.syson.sysml.MetadataUsage;
 import org.eclipse.syson.sysml.Namespace;
 import org.eclipse.syson.sysml.PartUsage;
 import org.eclipse.syson.sysml.SysmlFactory;
+import org.eclipse.syson.sysml.TextualRepresentation;
 import org.eclipse.syson.sysml.metamodel.util.ElementUtil;
+import org.eclipse.syson.tree.explorer.filters.SysONTreeFilterConstants;
 import org.eclipse.syson.tree.explorer.services.api.ISysONExplorerFilterService;
 import org.junit.jupiter.api.Test;
 
@@ -139,6 +142,78 @@ public class SysONExplorerFilterServiceTest {
         List<Object> filteredElements = this.filterService.hideRootNamespace(initialElements);
         assertThat(filteredElements).hasSize(1);
         assertThat(filteredElements.get(0)).isEqualTo(partUsage);
+    }
+
+    /**
+     * Both of these go through applyFilters rather than calling the hiding method directly,
+     * because the registration is the part that has actually been wrong: applyFilters is a fixed
+     * if-chain over known filter ids, so a hiding method that nothing calls is the failure mode to
+     * guard against, not a hiding method that filters the wrong list.
+     */
+    @Test
+    public void hideMetadataUsagesWhenTheFilterIsActive() {
+        MetadataUsage metadataUsage = SysmlFactory.eINSTANCE.createMetadataUsage();
+        Membership membership = SysmlFactory.eINSTANCE.createOwningMembership();
+        membership.getOwnedRelatedElement().add(metadataUsage);
+        PartUsage partUsage = SysmlFactory.eINSTANCE.createPartUsage();
+        List<Object> initialElements = List.of(membership, metadataUsage, partUsage);
+
+        List<Object> filteredElements = this.filterService.applyFilters(new IEditingContext.NoOp(), initialElements,
+                List.of(SysONTreeFilterConstants.HIDE_METADATA_USAGES_TREE_FILTER_ID));
+
+        assertThat(filteredElements).containsExactly(partUsage);
+    }
+
+    @Test
+    public void keepMetadataUsagesWhenTheFilterIsInactive() {
+        MetadataUsage metadataUsage = SysmlFactory.eINSTANCE.createMetadataUsage();
+        List<Object> initialElements = List.of(metadataUsage);
+
+        List<Object> filteredElements = this.filterService.applyFilters(new IEditingContext.NoOp(), initialElements, List.of());
+
+        assertThat(filteredElements).containsExactly(metadataUsage);
+    }
+
+    @Test
+    public void hideTextualRepresentationsWhenTheFilterIsActive() {
+        TextualRepresentation representation = SysmlFactory.eINSTANCE.createTextualRepresentation();
+        Membership membership = SysmlFactory.eINSTANCE.createOwningMembership();
+        membership.getOwnedRelatedElement().add(representation);
+        PartUsage partUsage = SysmlFactory.eINSTANCE.createPartUsage();
+        List<Object> initialElements = List.of(membership, representation, partUsage);
+
+        List<Object> filteredElements = this.filterService.applyFilters(new IEditingContext.NoOp(), initialElements,
+                List.of(SysONTreeFilterConstants.HIDE_TEXTUAL_REPRESENTATIONS_TREE_FILTER_ID));
+
+        assertThat(filteredElements).containsExactly(partUsage);
+    }
+
+    @Test
+    public void keepTextualRepresentationsWhenTheFilterIsInactive() {
+        TextualRepresentation representation = SysmlFactory.eINSTANCE.createTextualRepresentation();
+        List<Object> initialElements = List.of(representation);
+
+        List<Object> filteredElements = this.filterService.applyFilters(new IEditingContext.NoOp(), initialElements, List.of());
+
+        assertThat(filteredElements).containsExactly(representation);
+    }
+
+    /**
+     * The two filters are independent: hiding metadata must not take the narrative with it, and
+     * hiding the narrative must not take the marker with it. The objects differ in a way that
+     * matters - deleting the marker costs operational-concept status, deleting the representation
+     * destroys the document - so conflating them in one filter would blur that.
+     */
+    @Test
+    public void filterMetadataAndTextualRepresentationsIndependently() {
+        MetadataUsage metadataUsage = SysmlFactory.eINSTANCE.createMetadataUsage();
+        TextualRepresentation representation = SysmlFactory.eINSTANCE.createTextualRepresentation();
+        List<Object> initialElements = List.of(metadataUsage, representation);
+
+        assertThat(this.filterService.applyFilters(new IEditingContext.NoOp(), initialElements,
+                List.of(SysONTreeFilterConstants.HIDE_METADATA_USAGES_TREE_FILTER_ID))).containsExactly(representation);
+        assertThat(this.filterService.applyFilters(new IEditingContext.NoOp(), initialElements,
+                List.of(SysONTreeFilterConstants.HIDE_TEXTUAL_REPRESENTATIONS_TREE_FILTER_ID))).containsExactly(metadataUsage);
     }
 
     /**

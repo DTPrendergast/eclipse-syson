@@ -28,6 +28,13 @@ public class SysONTreeFilterConstants {
      */
     public static final String HIDE_METADATA_USAGES_TREE_FILTER_ID = UUID.nameUUIDFromBytes("SysONTreeMetadataUsagesFilter".getBytes()).toString();
 
+    /**
+     * Hides textual representations. Added by this fork: a {@code rep} holds the text of a
+     * document that is authored through a view of its own, so the element in the tree is the
+     * document's storage rather than something anyone edits there.
+     */
+    public static final String HIDE_TEXTUAL_REPRESENTATIONS_TREE_FILTER_ID = UUID.nameUUIDFromBytes("SysONTreeTextualRepresentationsFilter".getBytes()).toString();
+
     public static final String HIDE_MEMBERSHIPS_TREE_ITEM_FILTER_ID = UUID.nameUUIDFromBytes("SysONTreeItemMembershipsFilter".getBytes()).toString();
 
     public static final String HIDE_KERML_STANDARD_LIBRARIES_TREE_FILTER_ID = UUID.nameUUIDFromBytes("SysONTreeKerMLStandardLibrariesFilter".getBytes()).toString();

@@ -25,6 +25,7 @@ import org.eclipse.syson.sysml.Expose;
 import org.eclipse.syson.sysml.LibraryPackage;
 import org.eclipse.syson.sysml.Membership;
 import org.eclipse.syson.sysml.MetadataUsage;
+import org.eclipse.syson.sysml.TextualRepresentation;
 import org.eclipse.syson.sysml.Namespace;
 import org.eclipse.syson.sysml.metamodel.services.MetamodelQueryElementService;
 import org.eclipse.syson.sysml.metamodel.util.ElementUtil;
@@ -174,6 +175,28 @@ public class SysONExplorerFilterService implements ISysONExplorerFilterService {
         return metadata;
     }
 
+    /**
+     * Hides textual representations, and the memberships that own nothing else.
+     *
+     * @param elements
+     *            the candidate children
+     * @return the children that are not textual representations
+     */
+    public List<Object> hideTextualRepresentations(List<Object> elements) {
+        return elements.stream()
+                .filter(element -> !this.isTextualRepresentation(element))
+                .toList();
+    }
+
+    private boolean isTextualRepresentation(Object element) {
+        boolean representation = element instanceof TextualRepresentation;
+        if (!representation && element instanceof Membership membership) {
+            representation = !membership.getOwnedRelatedElement().isEmpty()
+                    && membership.getOwnedRelatedElement().stream().allMatch(TextualRepresentation.class::isInstance);
+        }
+        return representation;
+    }
+
     @Override
     public List<Object> applyFilters(IEditingContext editingContext, List<?> elements, List<String> activeFilterIds) {
         List<Object> alteredElements = new ArrayList<>(elements);
@@ -200,6 +223,9 @@ public class SysONExplorerFilterService implements ISysONExplorerFilterService {
         }
         if (activeFilterIds.contains(SysONTreeFilterConstants.HIDE_METADATA_USAGES_TREE_FILTER_ID)) {
             alteredElements = this.hideMetadataUsages(alteredElements);
+        }
+        if (activeFilterIds.contains(SysONTreeFilterConstants.HIDE_TEXTUAL_REPRESENTATIONS_TREE_FILTER_ID)) {
+            alteredElements = this.hideTextualRepresentations(alteredElements);
         }
         return alteredElements;
     }
