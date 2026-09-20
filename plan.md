@@ -941,6 +941,28 @@ continued line, so every prompt in this module had stray double spaces mid-sente
 model actually read. Fixed in all four prompts, and a test now asserts no prompt contains a double
 space.
 
+**Signed off 2026-09-20: `draft-narrative` is done.** Drafting from bullets returned a full
+page of usable prose that was accepted into the document, a section-scoped request came back as the
+complete narrative with the other sections intact, and a rejected candidate stays rejected.
+
+Two defects found by use, neither visible from the code. A section-scoped request answered with
+that section alone, and since applying **replaces** the document, accepting it deleted the
+hand-written sections it did not mention. The prompt now states that the reply replaces the whole
+document. And rejecting a candidate only set a flag in the review dialog's own state, so the
+proposal stayed `PENDING_REVIEW` and the resume path — which exists so a generation that cost money
+is not silently abandoned — offered the rejected text back on reopen. `rejectAiProposalItem` now
+records the decision and closes the proposal once nothing is left undecided.
+
+Rejection writes to the proposal store directly rather than through `IEditingContextDispatcher`: a
+rejected candidate is by definition one that never touches the model, so queueing the write behind
+every pending edit on the project's single-threaded editing-context executor would buy nothing.
+
+**TODO:** the review dialog shows the whole returned narrative, which is correct — accepting
+replaces the document, so the reviewer has to see all of it. But when only one section was asked
+about, reviewing a full page to find the changed paragraphs is more work than the change deserves.
+Showing the requested section against the current text needs a read-back of the stored narrative
+plus a client-side diff; wanted, not built.
+
 **TODO:** spike diagram generation before building a task for it. `expose` is a real SysML v2
 keyword the serializer writes, and SysON renders only exposed elements, so a `ViewUsage` carrying
 `expose` statements should populate a General or Interconnection View with no diagram-specific
