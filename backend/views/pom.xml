@@ -37,7 +37,7 @@
 		<module>syson-table-requirements-view</module>
 		<module>syson-form-operational-concept-view</module>
 		<module>syson-table-verification-view</module>
-		<module>syson-tree-metadata-filter</module>
+		<module>syson-tree-filters</module>
 		<module>syson-tree-explorer-view</module>
 		<module>syson-diagram-tests</module>
 	</modules>

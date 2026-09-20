@@ -22,10 +22,10 @@
 		<relativePath>../../../pom.xml</relativePath>
 	</parent>
 	<groupId>org.eclipse.syson</groupId>
-	<artifactId>syson-tree-metadata-filter</artifactId>
+	<artifactId>syson-tree-filters</artifactId>
 	<version>2026.7.4</version>
-	<name>syson-tree-metadata-filter</name>
-	<description>SysON Explorer Metadata Filter</description>
+	<name>syson-tree-filters</name>
+	<description>SysON Explorer Tree Filters (checkbox declarations for the SysON explorer)</description>
 
 	<dependencies>
 		<dependency>

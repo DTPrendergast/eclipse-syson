@@ -10,7 +10,7 @@
  * Contributors:
  *     Obeo - initial API and implementation
  *******************************************************************************/
-package org.eclipse.syson.tree.metadata.filter;
+package org.eclipse.syson.tree.filters;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
@@ -22,12 +22,12 @@ import com.tngtech.archunit.core.importer.ImportOption;
  * @author DTPrendergast
  */
 public final class ArchitectureConstants {
-    public static final String SYSON_TREE_METADATA_FILTER_ROOT_PACKAGE = "org.eclipse.syson.tree.metadata.filter..";
+    public static final String SYSON_TREE_FILTERS_ROOT_PACKAGE = "org.eclipse.syson.tree.filters..";
 
     public static final JavaClasses CLASSES = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_JARS)
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .importPackages(SYSON_TREE_METADATA_FILTER_ROOT_PACKAGE);
+            .importPackages(SYSON_TREE_FILTERS_ROOT_PACKAGE);
 
     private ArchitectureConstants() {
         // Prevent instantiation

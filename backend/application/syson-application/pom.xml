@@ -124,7 +124,7 @@
 		</dependency>
 		<dependency>
 			<groupId>org.eclipse.syson</groupId>
-			<artifactId>syson-tree-metadata-filter</artifactId>
+			<artifactId>syson-tree-filters</artifactId>
 		</dependency>
 
 		<!-- Test Dependencies -->
