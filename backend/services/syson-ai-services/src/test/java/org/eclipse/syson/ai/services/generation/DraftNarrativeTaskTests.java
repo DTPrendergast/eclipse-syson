@@ -45,10 +45,9 @@ class DraftNarrativeTaskTests {
     private static final String CONCEPT = """
             package DispatchOperations {
                 doc /* Everything to do with outage dispatch. */
-                @OperationalConceptLibrary::OperationalConcept {
-                    doc /* - dispatcher triages
-                           - crew restores power */
-                }
+                @OperationalConceptLibrary::OperationalConcept;
+                rep conopsNarrative language "markdown" /* - dispatcher triages
+                                                           - crew restores power */
             }
             """;
 
@@ -93,12 +92,12 @@ class DraftNarrativeTaskTests {
         assertThat(applied).isTrue();
         assertThat(this.narrativeService.getNarrative(concept)).isEqualTo("The dispatcher triages the outage; the crew then restores power.");
 
-        // Replacing, not appending: a second doc body would export as a second doc block and both
-        // would be valid SysML, so nothing would tell you which one was the narrative.
-        long documentationCount = this.narrativeService.findAnnotation(concept).getOwnedElement().stream()
-                .filter(Documentation.class::isInstance)
+        // Replacing, not appending: two narratives would both be valid SysML and would export as
+        // two reps, so nothing would tell you which one was the narrative.
+        long narrativeCount = concept.getOwnedElement().stream()
+                .filter(org.eclipse.syson.sysml.TextualRepresentation.class::isInstance)
                 .count();
-        assertThat(documentationCount).isEqualTo(1);
+        assertThat(narrativeCount).isEqualTo(1);
     }
 
     @Test

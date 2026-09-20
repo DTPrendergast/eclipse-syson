@@ -42,9 +42,8 @@ class OCFVServicesTests {
     private static final String WITH_NARRATIVE = """
             package DispatchOperations {
                 doc /* Everything to do with outage dispatch. */
-                @OperationalConceptLibrary::OperationalConcept {
-                    doc /* Dispatchers coordinate field crews during an outage. */
-                }
+                @OperationalConceptLibrary::OperationalConcept;
+                rep conopsNarrative language "markdown" /* Dispatchers coordinate field crews during an outage. */
                 part dispatcher;
             }
             """;
@@ -107,12 +106,12 @@ class OCFVServicesTests {
         this.mutationServices.setNarrative(concept, "first edit");
         this.mutationServices.setNarrative(concept, "second edit");
 
-        // Two doc bodies on the annotation would both be valid SysML and would export as two doc
-        // blocks, so this is the assertion that keeps editing idempotent.
-        long documentationCount = this.queryServices.operationalConceptAnnotation(concept).getOwnedElement().stream()
-                .filter(org.eclipse.syson.sysml.Documentation.class::isInstance)
+        // Two narratives on one concept would both be valid SysML and would export as two reps,
+        // so this is the assertion that keeps editing idempotent.
+        long narrativeCount = concept.getOwnedElement().stream()
+                .filter(org.eclipse.syson.sysml.TextualRepresentation.class::isInstance)
                 .count();
-        assertThat(documentationCount).isEqualTo(1);
+        assertThat(narrativeCount).isEqualTo(1);
         assertThat(this.queryServices.getNarrative(concept)).isEqualTo("second edit");
     }
 

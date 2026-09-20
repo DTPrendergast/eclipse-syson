@@ -207,7 +207,28 @@ be valid SysML and would export as two `doc` blocks.
 
 **Sizing is fine** — the editor fills the main panel (confirmed in use).
 
-**The narrative is documentation of the `OperationalConcept` annotation, not of the package**
+**The narrative is a `TextualRepresentation` on the operational concept** (moved 2026-09-20):
+`rep conopsNarrative language "markdown" /* … */`. Plain SysML v2 — it exports, any other v2 tool
+reads it, and its meaning is exactly what it holds: a textual representation of the element in a
+language the model states rather than leaves implied.
+
+Five standard homes were measured, and all five parse and export: a named second `doc`, a named
+`comment … about`, a `rep … language`, a nested package, and an unnamed second `doc`. `rep` won on
+semantics — a second `doc` means the package has two documentations distinguished only by a name a
+reader has to know, a `comment` is an informal note, and a nested package invents a package that is
+a package of nothing.
+
+**Why it moved.** It previously lived as documentation of the `@OperationalConcept` annotation, and
+that had two faults. The serializer drops applied metadata, so a whole ConOps document vanished on
+export **without saying so**. And it made the narrative depend on a marker that looks like
+incidental noise in the explorer — the user saw it as `conopsObject`, asked what would break if
+they deleted it, and the answer was "your ConOps document". A test now asserts that deleting the
+marker costs the operational-concept status but leaves the text.
+
+Content written under the old scheme is still read, and is moved on the next write, so nothing
+looks lost in the meantime.
+
+**Superseded:**
 (changed 2026-09-14). They are different things — a package's own `doc` says what the package is,
 the narrative says who uses the system and how — and sharing one body forced one to stand in for
 the other. Both now export as ordinary `doc` blocks any SysML v2 tool reads, so the separation

@@ -16,29 +16,44 @@ import org.eclipse.syson.sysml.Documentation;
 import org.eclipse.syson.sysml.Element;
 import org.eclipse.syson.sysml.MetadataUsage;
 import org.eclipse.syson.sysml.OwningMembership;
+import org.eclipse.syson.sysml.Relationship;
 import org.eclipse.syson.sysml.SysmlFactory;
+import org.eclipse.syson.sysml.TextualRepresentation;
 import org.springframework.stereotype.Service;
 
 /**
  * Reads and writes the narrative of an operational concept.
  *
  * <p>
- * It lives in this module, next to the metadata definition it depends on, because two very
- * different callers need it: the Operational Concept View, where a person edits the narrative, and
- * the AI assistant, which drafts one. Duplicating the traversal in both would be two places to get
- * the storage shape wrong.
+ * The narrative is a {@link TextualRepresentation} named {@code conopsNarrative}, in language
+ * {@code markdown}, owned by the operational concept itself. That is plain SysML v2 - it exports as
+ * {@code rep conopsNarrative language "markdown" \/* … *\/} and any other v2 tool reads it - and
+ * its meaning is exactly what it holds: a textual representation of the element, in a language the
+ * model states rather than leaves implied.
  * </p>
  *
  * <p>
- * The narrative is documentation of the {@code OperationalConcept} annotation, not of the element
- * itself. A package's own {@code doc} says what the package is; the narrative says who uses the
- * system and how. Keeping them apart means editing one never disturbs the other.
+ * It used to live as documentation of the {@code @OperationalConcept} annotation. Two things were
+ * wrong with that. The serializer drops applied metadata entirely, so a whole ConOps document
+ * vanished on export without saying so. And the narrative then depended on a marker that looks like
+ * incidental noise in the explorer - deleting what appeared to be a stray object destroyed the
+ * document. Here, deleting the marker costs the operational-concept status, not the text.
+ * </p>
+ *
+ * <p>
+ * Content written under the old scheme is still read, and is moved on the next write.
  * </p>
  *
  * @author DTPrendergast
  */
 @Service
 public class OperationalConceptNarrativeService {
+
+    /** The declared name of the narrative, so it is distinguishable from any other representation. */
+    public static final String NARRATIVE_NAME = "conopsNarrative";
+
+    /** Declared on the element rather than assumed by a reader. */
+    public static final String NARRATIVE_LANGUAGE = "markdown";
 
     /**
      * The {@code OperationalConcept} annotation on an element, if it carries one.
@@ -74,20 +89,26 @@ public class OperationalConceptNarrativeService {
      */
     public String getNarrative(Element element) {
         String narrative = "";
-        Documentation documentation = this.narrativeDocumentation(element);
-        if (documentation != null && documentation.getBody() != null) {
-            narrative = documentation.getBody();
+        TextualRepresentation representation = this.findNarrative(element);
+        if (representation != null && representation.getBody() != null) {
+            narrative = representation.getBody();
+        } else {
+            // Written under the previous scheme and not yet moved.
+            Documentation legacy = this.legacyNarrative(element);
+            if (legacy != null && legacy.getBody() != null) {
+                narrative = legacy.getBody();
+            }
         }
         return narrative;
     }
 
     /**
-     * Replaces the narrative, creating the {@code Documentation} if there is none yet.
+     * Replaces the narrative, creating the representation if there is none yet, and clearing out
+     * any copy left by the previous storage scheme.
      *
      * <p>
-     * Does nothing when the element carries no annotation. Falling back to the element's own
-     * documentation would put the narrative where nothing reads it back from, and would overwrite
-     * whatever that documentation said.
+     * Does nothing when the element is not an operational concept. Writing a narrative onto
+     * something else would put it where nothing reads it back from.
      * </p>
      *
      * @param element
@@ -102,39 +123,76 @@ public class OperationalConceptNarrativeService {
             body = narrative;
         }
 
-        MetadataUsage annotation = this.findAnnotation(element);
         boolean written = false;
-        if (annotation != null) {
-            Documentation documentation = this.firstDocumentation(annotation);
-            if (documentation == null) {
-                documentation = SysmlFactory.eINSTANCE.createDocumentation();
+        if (this.findAnnotation(element) != null) {
+            TextualRepresentation representation = this.findNarrative(element);
+            if (representation == null) {
+                representation = SysmlFactory.eINSTANCE.createTextualRepresentation();
+                representation.setDeclaredName(NARRATIVE_NAME);
+                representation.setLanguage(NARRATIVE_LANGUAGE);
                 OwningMembership owningMembership = SysmlFactory.eINSTANCE.createOwningMembership();
-                annotation.getOwnedRelationship().add(owningMembership);
-                owningMembership.getOwnedRelatedElement().add(documentation);
+                element.getOwnedRelationship().add(owningMembership);
+                owningMembership.getOwnedRelatedElement().add(representation);
             }
-            documentation.setBody(body);
+            representation.setBody(body);
+            this.removeLegacyNarrative(element);
             written = true;
         }
         return written;
     }
 
-    private Documentation narrativeDocumentation(Element element) {
-        Documentation documentation = null;
-        MetadataUsage annotation = this.findAnnotation(element);
-        if (annotation != null) {
-            documentation = this.firstDocumentation(annotation);
+    private TextualRepresentation findNarrative(Element element) {
+        TextualRepresentation found = null;
+        if (element != null) {
+            found = element.getOwnedRelationship().stream()
+                    .filter(OwningMembership.class::isInstance)
+                    .map(OwningMembership.class::cast)
+                    .flatMap(owningMembership -> owningMembership.getOwnedRelatedElement().stream())
+                    .filter(TextualRepresentation.class::isInstance)
+                    .map(TextualRepresentation.class::cast)
+                    .filter(representation -> NARRATIVE_NAME.equals(representation.getDeclaredName()))
+                    .findFirst()
+                    .orElse(null);
         }
-        return documentation;
+        return found;
     }
 
-    private Documentation firstDocumentation(Element element) {
-        return element.getOwnedRelationship().stream()
-                .filter(OwningMembership.class::isInstance)
-                .map(OwningMembership.class::cast)
-                .flatMap(owningMembership -> owningMembership.getOwnedRelatedElement().stream())
-                .filter(Documentation.class::isInstance)
-                .map(Documentation.class::cast)
-                .findFirst()
-                .orElse(null);
+    /**
+     * The narrative as the previous scheme stored it: documentation of the annotation.
+     */
+    private Documentation legacyNarrative(Element element) {
+        Documentation found = null;
+        MetadataUsage annotation = this.findAnnotation(element);
+        if (annotation != null) {
+            found = annotation.getOwnedRelationship().stream()
+                    .filter(OwningMembership.class::isInstance)
+                    .map(OwningMembership.class::cast)
+                    .flatMap(owningMembership -> owningMembership.getOwnedRelatedElement().stream())
+                    .filter(Documentation.class::isInstance)
+                    .map(Documentation.class::cast)
+                    .findFirst()
+                    .orElse(null);
+        }
+        return found;
+    }
+
+    /**
+     * Drops the old copy once the narrative has been written to its new home, so there is one
+     * source of truth rather than two that can drift apart.
+     */
+    private void removeLegacyNarrative(Element element) {
+        Documentation legacy = this.legacyNarrative(element);
+        if (legacy != null) {
+            MetadataUsage annotation = this.findAnnotation(element);
+            Relationship membership = annotation.getOwnedRelationship().stream()
+                    .filter(OwningMembership.class::isInstance)
+                    .map(OwningMembership.class::cast)
+                    .filter(owningMembership -> owningMembership.getOwnedRelatedElement().contains(legacy))
+                    .findFirst()
+                    .orElse(null);
+            if (membership != null) {
+                annotation.getOwnedRelationship().remove(membership);
+            }
+        }
     }
 }
