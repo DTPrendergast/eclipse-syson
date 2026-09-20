@@ -21,6 +21,13 @@ import java.util.UUID;
  */
 public class SysONTreeFilterConstants {
 
+    /**
+     * Hides applied metadata. Added by this fork: a metadata usage shows in the tree as an element
+     * of its own, which is structurally correct and reads as a stray object next to the content it
+     * annotates.
+     */
+    public static final String HIDE_METADATA_USAGES_TREE_FILTER_ID = UUID.nameUUIDFromBytes("SysONTreeMetadataUsagesFilter".getBytes()).toString();
+
     public static final String HIDE_MEMBERSHIPS_TREE_ITEM_FILTER_ID = UUID.nameUUIDFromBytes("SysONTreeItemMembershipsFilter".getBytes()).toString();
 
     public static final String HIDE_KERML_STANDARD_LIBRARIES_TREE_FILTER_ID = UUID.nameUUIDFromBytes("SysONTreeKerMLStandardLibrariesFilter".getBytes()).toString();

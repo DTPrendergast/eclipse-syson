@@ -18,6 +18,7 @@ import java.util.List;
 import org.eclipse.sirius.components.collaborative.trees.api.ITreeFilterProvider;
 import org.eclipse.sirius.components.collaborative.trees.api.TreeFilter;
 import org.eclipse.sirius.components.trees.description.TreeDescription;
+import org.eclipse.syson.tree.explorer.filters.SysONTreeFilterConstants;
 import org.eclipse.syson.tree.explorer.view.SysONExplorerTreeDescriptionProvider;
 import org.springframework.stereotype.Service;
 
@@ -39,9 +40,14 @@ import org.springframework.stereotype.Service;
  * </p>
  *
  * <p>
- * Registered as an additional {@link ITreeFilterProvider} rather than by editing SysON's. The
- * platform collects every provider - the Studio explorer ships its own alongside SysON's - and each
- * decides which tree it applies to.
+ * Only the checkbox lives here. The platform genuinely does collect every
+ * {@link ITreeFilterProvider} - the Studio explorer ships one alongside SysON's - so declaring a
+ * filter needs no upstream edit. Acting on it does: the SysON explorer computes its children
+ * through {@code SysONExplorerFilterService.applyFilters}, a fixed if-chain over SysON's own filter
+ * ids that never consults the platform's {@code IExplorerTreeItemAlteredContentProvider} beans. A
+ * provider registered that way is simply never called, which is how this filter first shipped -
+ * visible, toggleable, and doing nothing. The hiding is therefore a small patch to that service,
+ * and the id is taken from SysON's constants so the two cannot drift.
  * </p>
  *
  * @author DTPrendergast
@@ -53,7 +59,7 @@ public class MetadataTreeFilterProvider implements ITreeFilterProvider {
     public List<TreeFilter> get(String editingContextId, TreeDescription treeDescription) {
         List<TreeFilter> filters = new ArrayList<>();
         if (SysONExplorerTreeDescriptionProvider.SYSON_EXPLORER.equals(treeDescription.getLabel())) {
-            filters.add(new TreeFilter(MetadataTreeFilterConstants.HIDE_METADATA_USAGES_TREE_FILTER_ID, "Hide Metadata", true));
+            filters.add(new TreeFilter(SysONTreeFilterConstants.HIDE_METADATA_USAGES_TREE_FILTER_ID, "Hide Metadata", true));
         }
         return filters;
     }

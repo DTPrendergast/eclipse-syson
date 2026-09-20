@@ -24,6 +24,7 @@ import org.eclipse.syson.sysml.Element;
 import org.eclipse.syson.sysml.Expose;
 import org.eclipse.syson.sysml.LibraryPackage;
 import org.eclipse.syson.sysml.Membership;
+import org.eclipse.syson.sysml.MetadataUsage;
 import org.eclipse.syson.sysml.Namespace;
 import org.eclipse.syson.sysml.metamodel.services.MetamodelQueryElementService;
 import org.eclipse.syson.sysml.metamodel.util.ElementUtil;
@@ -143,6 +144,36 @@ public class SysONExplorerFilterService implements ISysONExplorerFilterService {
         }).toList();
     }
 
+    /**
+     * Hides applied metadata.
+     *
+     * <p>
+     * Added by this fork. It has to recognise a metadata usage in two shapes, because whether this
+     * runs before or after {@code hideMemberships} decides which one arrives: the explorer supplies
+     * children as memberships, and that filter flattens them to the elements they own. A membership
+     * is dropped only when everything it owns is metadata - one owning a mixture would take real
+     * content with it.
+     * </p>
+     *
+     * @param elements
+     *            the computed children
+     * @return the children without metadata usages
+     */
+    public List<Object> hideMetadataUsages(List<Object> elements) {
+        return elements.stream()
+                .filter(element -> !this.isMetadata(element))
+                .toList();
+    }
+
+    private boolean isMetadata(Object element) {
+        boolean metadata = element instanceof MetadataUsage;
+        if (!metadata && element instanceof Membership membership) {
+            metadata = !membership.getOwnedRelatedElement().isEmpty()
+                    && membership.getOwnedRelatedElement().stream().allMatch(MetadataUsage.class::isInstance);
+        }
+        return metadata;
+    }
+
     @Override
     public List<Object> applyFilters(IEditingContext editingContext, List<?> elements, List<String> activeFilterIds) {
         List<Object> alteredElements = new ArrayList<>(elements);
@@ -166,6 +197,9 @@ public class SysONExplorerFilterService implements ISysONExplorerFilterService {
         }
         if (activeFilterIds.contains(SysONTreeFilterConstants.HIDE_EXPRESSION_INTERNALS_ID)) {
             alteredElements = this.hideExpressionInternals(alteredElements);
+        }
+        if (activeFilterIds.contains(SysONTreeFilterConstants.HIDE_METADATA_USAGES_TREE_FILTER_ID)) {
+            alteredElements = this.hideMetadataUsages(alteredElements);
         }
         return alteredElements;
     }
