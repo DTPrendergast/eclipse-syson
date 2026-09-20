@@ -155,6 +155,10 @@ class DraftNarrativeTaskTests {
         // The heading rule earned its place: the first narrative written in this project used
         // "#Introduction" with no space, which is not a heading in any Markdown dialect.
         assertThat(request.systemPrompt()).contains("needs a space after the hashes");
+        // A request about one section used to come back as only that section, and accepting it
+        // replaced the whole document with it - the engineer lost their Introduction and Mission.
+        assertThat(request.systemPrompt()).contains("Always return the complete narrative");
+        assertThat(request.systemPrompt()).contains("every other section reproduced exactly as it was");
     }
 
     private AiProposal proposalWith(String prose) {

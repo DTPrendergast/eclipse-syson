@@ -80,9 +80,14 @@ public class DraftNarrativeTask implements IAiTask {
             Keep their Markdown headings, and use `## ` for sub-sections. A heading needs a space \
             after the hashes or it is not a heading.
 
+            **Always return the complete narrative.** What you write replaces the whole document, \
+            so anything you leave out is deleted. When the engineer asks about one section - "turn \
+            the bullets in Policies into prose" - rewrite that section and return it inside the \
+            entire narrative, with every other section reproduced exactly as it was, headings and \
+            all. Returning only the part you were asked about destroys the rest of their document.
+
             Reply with the narrative itself and nothing else. No preamble, no explanation of what \
-            you changed, no code fences. What you write is shown to the engineer and replaces their \
-            narrative verbatim if they accept it.
+            you changed, no code fences.
             """;
 
     private final TaskPrompts prompts;
