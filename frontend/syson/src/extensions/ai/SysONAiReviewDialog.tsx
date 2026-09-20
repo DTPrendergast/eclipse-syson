@@ -27,9 +27,12 @@ import Typography from '@mui/material/Typography';
 import { useEffect, useState } from 'react';
 import {
   AI_TASKS,
+  REPLACING_TASKS,
   GQLAiProposal,
   GQLApplyAiProposalItemData,
   GQLApplyAiProposalItemVariables,
+  GQLRejectAiProposalItemData,
+  GQLRejectAiProposalItemVariables,
   GQLGenerateAiProposalData,
   GQLGenerateAiProposalSuccessPayload,
   GQLGenerateAiProposalVariables,
@@ -83,6 +86,17 @@ const pendingAiProposalsQuery = gql`
   }
 `;
 
+const rejectAiProposalItemMutation = gql`
+  mutation rejectAiProposalItem($input: RejectAiProposalItemInput!) {
+    rejectAiProposalItem(input: $input) {
+      __typename
+      ... on ErrorPayload {
+        message
+      }
+    }
+  }
+`;
+
 const applyAiProposalItemMutation = gql`
   mutation applyAiProposalItem($input: ApplyAiProposalItemInput!) {
     applyAiProposalItem(input: $input) {
@@ -99,7 +113,8 @@ const applyAiProposalItemMutation = gql`
  *
  * Nothing here applies anything on its own: every candidate is shown as the exact textual SysML v2
  * that will be added if it is accepted, and it is added only when someone presses Accept. Rejecting
- * is purely local - it means "never apply this" - so a rejected candidate changes nothing.
+ * changes nothing in the model - that is what it means - but it is still recorded, because a
+ * proposal that is left undecided is one the dialog offers again the next time it opens.
  */
 export const SysONAiReviewDialog = ({
   editingContextId,
@@ -166,6 +181,10 @@ export const SysONAiReviewDialog = ({
     applyAiProposalItemMutation
   );
 
+  const [rejectItem, { loading: rejecting }] = useMutation<GQLRejectAiProposalItemData, GQLRejectAiProposalItemVariables>(
+    rejectAiProposalItemMutation
+  );
+
   const onGenerate = () => {
     setProblems([]);
     setItems([]);
@@ -216,7 +235,21 @@ export const SysONAiReviewDialog = ({
   };
 
   const onReject = (item: GQLProposedItem) => {
-    setDecisions((current) => ({ ...current, [item.id]: 'rejected' }));
+    if (proposalId === null) {
+      return;
+    }
+    rejectItem({
+      variables: {
+        input: {
+          id: crypto.randomUUID(),
+          proposalId,
+          itemId: item.id,
+        },
+      },
+    }).then(({ data }) => {
+      const rejected = data?.rejectAiProposalItem.__typename === 'SuccessPayload';
+      setDecisions((current) => ({ ...current, [item.id]: rejected ? 'rejected' : 'failed' }));
+    });
   };
 
   return (
@@ -226,6 +259,12 @@ export const SysONAiReviewDialog = ({
         <Stack spacing={2}>
           {proposalId !== null && !generating ? (
             <Alert severity="info">Resumed an earlier proposal that had not been reviewed yet.</Alert>
+          ) : null}
+          {REPLACING_TASKS.includes(task) ? (
+            <Alert severity="warning">
+              Accepting replaces the whole document, not just the part you asked about. Review the full text before
+              accepting.
+            </Alert>
           ) : null}
           <Typography variant="body2" color="textSecondary">
             {selectedIds.length === 0
@@ -278,7 +317,7 @@ export const SysONAiReviewDialog = ({
                     <Button size="small" variant="contained" disabled={applying} onClick={() => onAccept(item)}>
                       Accept
                     </Button>
-                    <Button size="small" onClick={() => onReject(item)}>
+                    <Button size="small" disabled={rejecting} onClick={() => onReject(item)}>
                       Reject
                     </Button>
                   </Stack>

@@ -75,6 +75,18 @@ export interface GQLApplyAiProposalItemVariables {
   };
 }
 
+export interface GQLRejectAiProposalItemData {
+  rejectAiProposalItem: GQLGenerateAiProposalPayload;
+}
+
+export interface GQLRejectAiProposalItemVariables {
+  input: {
+    id: string;
+    proposalId: string;
+    itemId: string;
+  };
+}
+
 export interface GQLAiProposalItem {
   id: string;
   label: string;
@@ -137,6 +149,15 @@ export const AI_TASKS: AiTaskOption[] = [
     hint: "Fills in one use case's details: actor, trigger, flow and outcome. Accepting REPLACES that use case's documentation.",
   },
 ];
+
+/**
+ * Tasks whose candidate replaces an existing document rather than adding to the model.
+ *
+ * Worth saying out loud in the dialog: a request about one section still returns - and applies -
+ * the entire document, and a reviewer who reads only the changed part can accept a response that
+ * silently drops the rest.
+ */
+export const REPLACING_TASKS: string[] = ['draft-narrative', 'detail-use-case'];
 
 /**
  * Where a candidate has got to in this dialog. "rejected" is local: rejecting a candidate simply

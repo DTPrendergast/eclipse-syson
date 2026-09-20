@@ -25,6 +25,7 @@ import org.eclipse.sirius.components.core.api.IInput;
 import org.eclipse.sirius.components.core.api.IObjectSearchService;
 import org.eclipse.sirius.components.core.api.IPayload;
 import org.eclipse.sirius.components.core.api.SuccessPayload;
+import org.eclipse.sirius.web.domain.boundedcontexts.representationdata.RepresentationMetadata;
 import org.eclipse.sirius.components.emf.services.api.IEMFEditingContext;
 import org.eclipse.sirius.components.representations.Message;
 import org.eclipse.sirius.components.collaborative.api.ChangeKind;
@@ -33,6 +34,7 @@ import org.eclipse.syson.ai.services.generation.AiTaskRegistry;
 import org.eclipse.syson.ai.services.generation.IAiTask;
 import org.eclipse.syson.ai.services.proposal.AiProposal;
 import org.eclipse.syson.ai.services.proposal.AiProposalItem;
+import org.eclipse.syson.ai.services.proposal.AiProposalItemStatus;
 import org.eclipse.syson.ai.services.proposal.IAiProposalRepository;
 import org.eclipse.syson.sysml.Element;
 import org.springframework.stereotype.Service;
@@ -84,9 +86,11 @@ public class ApplyAiProposalItemEventHandler implements IEditingContextEventHand
     private IPayload applyItem(ApplyAiProposalItemInput input, IEMFEditingContext emfEditingContext, Sinks.Many<ChangeDescription> changeDescriptionSink,
             IEditingContext editingContext) {
         Optional<AiProposal> optionalProposal = this.findProposal(input.proposalId());
-        Optional<Element> optionalParent = this.objectSearchService.getObject(editingContext, input.parentElementId())
-                .filter(Element.class::isInstance)
-                .map(Element.class::cast);
+        // Follows a representation to what it represents, the same way scope gathering does. An
+        // assistant opened from a representation's context menu - the CONOPS Narrative View - hands
+        // over that representation's id, and a representation is not a model element. Generation
+        // already resolved it; applying did not, so a good proposal failed at the last step.
+        Optional<Element> optionalParent = this.resolveElement(editingContext, input.parentElementId());
 
         IPayload payload = new ErrorPayload(input.id(), "The proposal, the item or the parent element could not be found.");
         if (optionalProposal.isPresent() && optionalParent.isPresent()) {
@@ -117,6 +121,13 @@ public class ApplyAiProposalItemEventHandler implements IEditingContextEventHand
 
         IPayload payload;
         if (applied) {
+            // Close the proposal once no candidate is still awaiting a decision. Without this every
+            // proposal stays PENDING_REVIEW for ever and keeps being offered as something to resume,
+            // which is how an already-applied run reappeared under a later request.
+            boolean anythingLeft = proposal.getItems().stream().anyMatch(candidate -> candidate.getStatus() == AiProposalItemStatus.PENDING);
+            if (!anythingLeft) {
+                proposal.reviewCompleted();
+            }
             // Persisting after the model write, so a proposal is never marked applied for an
             // element that did not actually land.
             this.proposalRepository.save(proposal);
@@ -126,6 +137,17 @@ public class ApplyAiProposalItemEventHandler implements IEditingContextEventHand
             payload = new ErrorPayload(input.id(), "The proposed element could not be applied.", messages);
         }
         return payload;
+    }
+
+    private Optional<Element> resolveElement(IEditingContext editingContext, String identifier) {
+        Optional<Object> object = this.objectSearchService.getObject(editingContext, identifier);
+
+        if (object.filter(RepresentationMetadata.class::isInstance).isPresent()) {
+            object = object.map(RepresentationMetadata.class::cast)
+                    .flatMap(metadata -> this.objectSearchService.getObject(editingContext, metadata.getTargetObjectId()));
+        }
+
+        return object.filter(Element.class::isInstance).map(Element.class::cast);
     }
 
     private Optional<AiProposal> findProposal(String proposalId) {

@@ -23,6 +23,7 @@ type AiProposalItem {
 extend type Mutation {
   generateAiProposal(input: GenerateAiProposalInput!): GenerateAiProposalPayload!
   applyAiProposalItem(input: ApplyAiProposalItemInput!): ApplyAiProposalItemPayload!
+  rejectAiProposalItem(input: RejectAiProposalItemInput!): RejectAiProposalItemPayload!
 }
 
 input GenerateAiProposalInput {
@@ -58,3 +59,11 @@ input ApplyAiProposalItemInput {
 }
 
 union ApplyAiProposalItemPayload = ErrorPayload | SuccessPayload
+
+input RejectAiProposalItemInput {
+  id: ID!
+  proposalId: String!
+  itemId: String!
+}
+
+union RejectAiProposalItemPayload = ErrorPayload | SuccessPayload
