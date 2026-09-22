@@ -963,6 +963,48 @@ about, reviewing a full page to find the changed paragraphs is more work than th
 Showing the requested section against the current text needs a read-back of the stored narrative
 plus a client-side diff; wanted, not built.
 
+**Reshaped 2026-09-22: the Use Case AI Assistant writes use cases rather than detailing them.**
+The intent it now serves, stated by the user: the CONOPS package is exported to a separate AI
+pipeline that produces a human-readable ConOps document. Its text comes from the narrative, and the
+"Description of Operational Employment (Use Cases)" section carries the use case diagrams and
+descriptions. So the engineer drafts use case descriptions in the narrative under one `###` heading
+each, and the assistant turns that section into model content.
+
+Creating rather than detailing was the user's own loosening of the workflow, and it removed the one
+step never proven: transplanting generated members into an existing element without disturbing its
+identity. Creating lands on the path that is proven.
+
+Four parser facts established by running it, all pinned in `UseCaseBodyImportTests`:
+
+- Body members handed to the importer alone produce nothing and report nothing. `actor`, `subject`,
+  `objective` and `require` are only grammatical inside a declaration. Detailing an existing use
+  case therefore cannot work by importing its body, which is what made creating the better shape.
+- A complete declaration imported into the owning package binds every member correctly.
+- `include missionPlanning;` binds to a sibling. This is what makes a step described once and
+  reused elsewhere expressible as a reference - the user's mission-planning case.
+- `include use case missionPlanning;` declares a nested use case sharing the name, binds nothing,
+  and raises no message. The task rewrites it and says so.
+
+**Known boundary, pinned:** an include resolves only against a use case in the same response,
+because validation parses the reply with no model around it; out of reach the name is dropped from
+the fragment, reported rather than silent. Generate the set together when they reference each
+other. The prompt says so.
+
+**TODO:** regenerating creates a second set rather than replacing the first. Making it replace is
+the transplant question again, and is a cleaner increment once the generated structure has been
+judged against a real run.
+
+**TODO:** nothing in the use case rework has been through the real API. The parser side is tested;
+whether the model recognises a shared step as one use case referenced from several is a judgement
+only a real run settles.
+
+**TODO:** diagram images cannot ride along in a package export. Sirius Web's `ExportToImage`
+(`exportToPNG` / `exportToSVG`) is built on `html-to-image` and rasterises the DOM of a diagram
+open in a browser; there is no server-side render. Either the downstream pipeline draws its own
+diagram from the structured SysML - which is why structure was prioritised over the diagram - or
+each diagram needs a manual browser export. The user has not settled which. Adding server-side
+rendering would mean a headless browser in the backend: flag, do not undertake.
+
 **TODO:** spike diagram generation before building a task for it. `expose` is a real SysML v2
 keyword the serializer writes, and SysON renders only exposed elements, so a `ViewUsage` carrying
 `expose` statements should populate a General or Interconnection View with no diagram-specific
