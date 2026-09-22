@@ -27,6 +27,8 @@ import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.syson.ai.services.generation.DerivedRequirementsTask;
 import org.eclipse.syson.ai.services.generation.DraftUseCasesTask;
+import org.eclipse.syson.operational.concept.library.OperationalConceptNarrativeService;
+import org.eclipse.syson.operational.concept.library.UseCasePackageService;
 import org.eclipse.syson.ai.services.generation.TaskPrompts;
 import org.eclipse.syson.ai.services.generation.GenerationRequest;
 import org.eclipse.syson.ai.services.generation.GenerationResult;
@@ -90,7 +92,7 @@ class AiProposalPipelineTests {
 
     private final DerivedRequirementsTask derivedRequirements = new DerivedRequirementsTask(new TaskPrompts(), this.validator, this.applyService);
 
-    private final DraftUseCasesTask draftUseCases = new DraftUseCasesTask(new TaskPrompts(), this.validator, this.applyService);
+    private final DraftUseCasesTask draftUseCases = new DraftUseCasesTask(new TaskPrompts(), this.validator, this.applyService, new UseCasePackageService(), new OperationalConceptNarrativeService());
 
     private final AiProposalPipeline pipeline = new AiProposalPipeline(this.generationClient, this.repository);
 

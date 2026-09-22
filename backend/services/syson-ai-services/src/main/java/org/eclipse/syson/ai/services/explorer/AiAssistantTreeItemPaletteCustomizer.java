@@ -28,7 +28,6 @@ import org.eclipse.sirius.components.trees.description.TreeDescription;
 import org.eclipse.sirius.web.domain.boundedcontexts.representationdata.RepresentationMetadata;
 import org.eclipse.syson.operational.concept.library.OperationalConceptNarrativeService;
 import org.eclipse.syson.sysml.Element;
-import org.eclipse.syson.sysml.UseCaseUsage;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
@@ -39,8 +38,8 @@ import org.springframework.stereotype.Service;
  * <p>
  * The narrative assistant hangs off a <em>representation</em> of an operational concept - the
  * CONOPS Narrative View - because that is where the narrative is read and written. The use case
- * assistant hangs off an individual {@code UseCaseUsage}, because it details one use case rather
- * than inventing the set of them.
+ * assistant hangs off the operational concept package, because it writes the use cases from that
+ * concept's narrative and files them in a "Use Cases" package beneath it.
  * </p>
  *
  * <p>
@@ -83,7 +82,7 @@ public class AiAssistantTreeItemPaletteCustomizer implements ITreeItemPaletteCus
 
     @Override
     public boolean canHandle(IEditingContext editingContext, TreeDescription treeDescription, Tree tree, TreeItem treeItem) {
-        return this.isOperationalConceptRepresentation(editingContext, treeItem) || this.isUseCase(editingContext, treeItem);
+        return this.isOperationalConceptRepresentation(editingContext, treeItem) || this.isOperationalConcept(editingContext, treeItem);
     }
 
     @Override
@@ -92,7 +91,7 @@ public class AiAssistantTreeItemPaletteCustomizer implements ITreeItemPaletteCus
         if (this.isOperationalConceptRepresentation(editingContext, treeItem)) {
             entries.add(new SingleClickTreeItemTool(NARRATIVE_ASSISTANT_ENTRY_ID, "Narrative AI Assistant", List.of(), false, List.of()));
         }
-        if (this.isUseCase(editingContext, treeItem)) {
+        if (this.isOperationalConcept(editingContext, treeItem)) {
             entries.add(new SingleClickTreeItemTool(USE_CASE_ASSISTANT_ENTRY_ID, "Use Case AI Assistant", List.of(), false, List.of()));
         }
         return new Palette(palette.id(), palette.quickAccessTools(), entries);
@@ -120,9 +119,21 @@ public class AiAssistantTreeItemPaletteCustomizer implements ITreeItemPaletteCus
                 .isPresent();
     }
 
-    private boolean isUseCase(IEditingContext editingContext, TreeItem treeItem) {
+    /**
+     * Whether this tree item is the operational concept package itself.
+     *
+     * <p>
+     * The use case assistant used to hang off an individual use case, because it detailed a use
+     * case that someone had already created. It now writes the use cases themselves, from the
+     * narrative, so it belongs where the narrative is. What it creates goes into a "Use Cases"
+     * package beneath this one rather than beside the narrative.
+     * </p>
+     */
+    private boolean isOperationalConcept(IEditingContext editingContext, TreeItem treeItem) {
         return this.objectSearchService.getObject(editingContext, treeItem.getId())
-                .filter(UseCaseUsage.class::isInstance)
+                .filter(Element.class::isInstance)
+                .map(Element.class::cast)
+                .filter(element -> this.narrativeService.findAnnotation(element) != null)
                 .isPresent();
     }
 }

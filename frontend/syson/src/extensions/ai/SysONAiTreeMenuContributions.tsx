@@ -91,8 +91,11 @@ export const AiNarrativeAssistantPaletteContribution = aiTaskPaletteContribution
   'Narrative AI Assistant'
 );
 
-/** On an individual use case; fills in that use case's details. */
+/**
+ * On the operational concept package; writes the use cases from that concept's narrative and files
+ * them in a 'Use Cases' package beneath it.
+ */
 export const AiUseCaseAssistantPaletteContribution = aiTaskPaletteContribution(
-  'detail-use-case',
+  'draft-use-cases',
   'Use Case AI Assistant'
 );
