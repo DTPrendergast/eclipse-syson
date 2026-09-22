@@ -35,5 +35,5 @@ import org.eclipse.sirius.components.core.api.IInput;
  *
  * @author DTPrendergast
  */
-public record GatherModelScopeInput(UUID id, String editingContextId, List<String> elementIds) implements IInput {
+public record GatherModelScopeInput(UUID id, String editingContextId, List<String> elementIds, String taskKind) implements IInput {
 }

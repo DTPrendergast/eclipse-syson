@@ -26,6 +26,8 @@ import org.eclipse.sirius.components.core.api.IPayload;
 import org.eclipse.sirius.web.domain.boundedcontexts.representationdata.RepresentationMetadata;
 import org.eclipse.syson.ai.services.graphql.dto.GatherModelScopeInput;
 import org.eclipse.syson.ai.services.graphql.dto.GatherModelScopePayload;
+import org.eclipse.syson.ai.services.generation.AiTaskRegistry;
+import org.eclipse.syson.ai.services.generation.IAiTask;
 import org.eclipse.syson.ai.services.scope.ModelScopePolicy;
 import org.eclipse.syson.ai.services.scope.ModelScopeSelector;
 import org.eclipse.syson.ai.services.scope.ModelScopeSerializer;
@@ -55,10 +57,13 @@ public class GatherModelScopeEventHandler implements IEditingContextEventHandler
 
     private final ModelScopeSerializer serializer;
 
-    public GatherModelScopeEventHandler(IObjectSearchService objectSearchService, ModelScopeSelector selector, ModelScopeSerializer serializer) {
+    private final AiTaskRegistry taskRegistry;
+
+    public GatherModelScopeEventHandler(IObjectSearchService objectSearchService, ModelScopeSelector selector, ModelScopeSerializer serializer, AiTaskRegistry taskRegistry) {
         this.objectSearchService = Objects.requireNonNull(objectSearchService);
         this.selector = Objects.requireNonNull(selector);
         this.serializer = Objects.requireNonNull(serializer);
+        this.taskRegistry = Objects.requireNonNull(taskRegistry);
     }
 
     @Override
@@ -68,10 +73,16 @@ public class GatherModelScopeEventHandler implements IEditingContextEventHandler
 
     @Override
     public void handle(Sinks.One<IPayload> payloadSink, Sinks.Many<ChangeDescription> changeDescriptionSink, IEditingContext editingContext, IInput input) {
+        // How much of the model to show is the task's business: detailing one element needs its
+        // surroundings, deriving requirements from a selection does not. An unknown kind falls back
+        // to the shared policy rather than failing here - the generate mutation is what reports it.
         var policy = ModelScopePolicy.defaultPolicy();
         var seeds = new ArrayList<Element>();
 
         if (input instanceof GatherModelScopeInput scopeInput) {
+            policy = this.taskRegistry.findByKind(scopeInput.taskKind())
+                    .map(IAiTask::scopePolicy)
+                    .orElse(policy);
             for (String elementId : scopeInput.elementIds()) {
                 this.resolveElement(editingContext, elementId).ifPresent(seeds::add);
             }

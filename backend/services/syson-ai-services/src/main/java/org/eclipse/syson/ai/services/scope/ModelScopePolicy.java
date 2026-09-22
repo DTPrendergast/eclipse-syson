@@ -37,10 +37,27 @@ package org.eclipse.syson.ai.services.scope;
  *
  * @author DTPrendergast
  */
-public record ModelScopePolicy(int ownedDepth, int relatedDepth, int maxElements, int maxCharacters) {
+public record ModelScopePolicy(int ownedDepth, int relatedDepth, int maxElements, int maxCharacters, int ancestorDepth) {
+
+    /**
+     * A policy that does not walk upward, which is what every task wanted before detailing a single
+     * element became one of them.
+     *
+     * @param ownedDepth
+     *            how far to walk into what an element owns
+     * @param relatedDepth
+     *            how many reference hops to follow
+     * @param maxElements
+     *            the element budget
+     * @param maxCharacters
+     *            the rendered-character budget
+     */
+    public ModelScopePolicy(int ownedDepth, int relatedDepth, int maxElements, int maxCharacters) {
+        this(ownedDepth, relatedDepth, maxElements, maxCharacters, 0);
+    }
 
     public ModelScopePolicy {
-        if (ownedDepth < 0 || relatedDepth < 0) {
+        if (ownedDepth < 0 || relatedDepth < 0 || ancestorDepth < 0) {
             throw new IllegalArgumentException("Depths must not be negative");
         }
         if (maxElements < 1 || maxCharacters < 1) {
@@ -59,6 +76,6 @@ public record ModelScopePolicy(int ownedDepth, int relatedDepth, int maxElements
      * @return the default policy
      */
     public static ModelScopePolicy defaultPolicy() {
-        return new ModelScopePolicy(3, 1, 200, 60000);
+        return new ModelScopePolicy(3, 1, 200, 60000, 0);
     }
 }

@@ -97,7 +97,7 @@ public class MutationGenerateAiProposalDataFetcher implements IDataFetcherWithFi
         Object argument = environment.getArgument(INPUT_ARGUMENT);
         var input = this.objectMapper.convertValue(argument, GenerateAiProposalInput.class);
 
-        var gatherScope = new GatherModelScopeInput(UUID.randomUUID(), input.editingContextId(), input.elementIds());
+        var gatherScope = new GatherModelScopeInput(UUID.randomUUID(), input.editingContextId(), input.elementIds(), input.task());
 
         Mono<IPayload> result = this.editingContextDispatcher.dispatchQuery(input.editingContextId(), gatherScope)
                 .flatMap(payload -> this.generate(input, payload));

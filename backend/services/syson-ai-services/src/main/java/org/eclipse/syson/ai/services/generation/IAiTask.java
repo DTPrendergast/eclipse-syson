@@ -18,6 +18,7 @@ import org.eclipse.sirius.components.emf.services.api.IEMFEditingContext;
 import org.eclipse.sirius.components.representations.Message;
 import org.eclipse.syson.ai.services.proposal.AiProposal;
 import org.eclipse.syson.ai.services.proposal.AiProposalItem;
+import org.eclipse.syson.ai.services.scope.ModelScopePolicy;
 import org.eclipse.syson.ai.services.scope.SerializedModelScope;
 import org.eclipse.syson.ai.services.validation.ValidationResult;
 import org.eclipse.syson.sysml.Element;
@@ -50,6 +51,21 @@ public interface IAiTask {
      * @return a stable kebab-case identifier
      */
     String kind();
+
+    /**
+     * How much of the model this task needs to be shown.
+     *
+     * <p>
+     * Defaults to the shared policy, which expands downward and sideways from what the user
+     * selected. A task that works <em>on</em> one element rather than <em>from</em> a selection
+     * usually needs its surroundings too, and overrides this.
+     * </p>
+     *
+     * @return the scope policy for this task
+     */
+    default ModelScopePolicy scopePolicy() {
+        return ModelScopePolicy.defaultPolicy();
+    }
 
     /**
      * Builds the prompt.

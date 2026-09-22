@@ -20,6 +20,7 @@ import org.eclipse.sirius.components.representations.Message;
 import org.eclipse.sirius.components.representations.MessageLevel;
 import org.eclipse.syson.ai.services.proposal.AiProposal;
 import org.eclipse.syson.ai.services.proposal.AiProposalItem;
+import org.eclipse.syson.ai.services.scope.ModelScopePolicy;
 import org.eclipse.syson.ai.services.scope.SerializedModelScope;
 import org.eclipse.syson.ai.services.validation.GeneratedCandidate;
 import org.eclipse.syson.ai.services.validation.ValidationResult;
@@ -90,6 +91,23 @@ public class DetailUseCaseTask implements IAiTask {
     @Override
     public String kind() {
         return KIND;
+    }
+
+    /**
+     * One level up, then down again.
+     *
+     * <p>
+     * The system prompt tells the model it is given the surrounding model - the narrative and the
+     * other use cases - and without this it was not: a use case owns its own documentation and
+     * little else, so a generation seeded on one saw only that use case, and wrote generic details
+     * that borrowed none of the concept's language. Reaching the owning package and expanding it
+     * brings in the ConOps narrative and the sibling use cases, which is what the prompt promises.
+     * </p>
+     */
+    @Override
+    public ModelScopePolicy scopePolicy() {
+        var shared = ModelScopePolicy.defaultPolicy();
+        return new ModelScopePolicy(shared.ownedDepth(), shared.relatedDepth(), shared.maxElements(), shared.maxCharacters(), 1);
     }
 
     @Override

@@ -67,8 +67,27 @@ public class ModelScopeSelector {
         var inScope = new LinkedHashSet<Element>(keptSeeds);
         boolean limitReached = this.trimToLimit(inScope, policy.maxElements());
 
+        // Ancestors first, and expanded like any other root: a task that details one element needs
+        // what surrounds it, and what surrounds an element is owned by its owner, not by it. A use
+        // case seeded on its own reaches neither the operational concept narrative nor its sibling
+        // use cases, because both hang off the package above it.
+        var ancestors = new ArrayList<Element>();
+        if (!limitReached && policy.ancestorDepth() > 0) {
+            ancestors.addAll(this.ancestorsOf(keptSeeds, policy.ancestorDepth(), inScope));
+            for (Element ancestor : ancestors) {
+                if (inScope.size() >= policy.maxElements()) {
+                    limitReached = true;
+                    break;
+                }
+                inScope.add(ancestor);
+            }
+        }
+
         if (!limitReached) {
             limitReached = this.addOwnedClosure(inScope, keptSeeds, policy);
+        }
+        if (!limitReached && !ancestors.isEmpty()) {
+            limitReached = this.addOwnedClosure(inScope, ancestors, policy);
         }
 
         for (int hop = 0; hop < policy.relatedDepth() && !limitReached; hop++) {
@@ -94,6 +113,31 @@ public class ModelScopeSelector {
         }
 
         return new ModelScope(keptSeeds, List.copyOf(inScope), limitReached);
+    }
+
+    /**
+     * The owning namespaces of each seed, nearest first, up to {@code depth} levels.
+     *
+     * <p>
+     * Walks {@link Element#getOwningNamespace()} rather than {@link Element#getOwner()}: ownership
+     * runs through a membership object, so {@code getOwner()} on a use case is the membership that
+     * holds it, not the package a reader would call its parent.
+     * </p>
+     */
+    private List<Element> ancestorsOf(List<Element> seeds, int depth, LinkedHashSet<Element> alreadyInScope) {
+        var found = new LinkedHashSet<Element>();
+        for (Element seed : seeds) {
+            Element current = seed;
+            for (int level = 0; level < depth; level++) {
+                Element owner = current.getOwningNamespace();
+                if (owner == null || !this.isEligible(owner) || alreadyInScope.contains(owner)) {
+                    break;
+                }
+                found.add(owner);
+                current = owner;
+            }
+        }
+        return List.copyOf(found);
     }
 
     /**
